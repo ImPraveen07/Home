@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Art Gallery Pro - Bay Window Scene</title>
+    <style>
+        /* ... (Styling remains the same) ... */
+        body { margin: 0; overflow: hidden; background-color: #f0f0f0; touch-action: none; font-family: 'Georgia', serif; user-select: none; -webkit-user-select: none; }
+
+        /* DEBUG CONSOLE */
+        #debug-console {
+            position: absolute; top: 0; left: 0; width: 100%;
+            background: rgba(255,255,255,0.8); color: #333; font-size: 12px;
+            padding: 5px; pointer-events: none; z-index: 9999;
+            white-space: pre-wrap; border-bottom: 1px solid #ccc;
+        }
+
+        /* LOGIN SCREEN */
+        #login-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #e9e9e9; z-index: 100; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+        h1 { color: #333; text-shadow: 0 0 5px rgba(0,0,0,0.1); font-size: 32px; margin-bottom: 30px; text-align: center; font-family: 'Times New Roman', serif; }
+        input { 
+            padding: 15px; font-size: 18px; text-align: center; width: 280px;
+            background: #fff; border: 1px solid #888; color: #333; border-radius: 5px; outline: none;
+            font-family: Arial, sans-serif; margin-bottom: 15px;
+        }
+        button#join-btn { 
+            padding: 15px 60px; background: #333; color: #fff; border: none; margin-top: 10px;
+            font-weight: bold; font-size: 20px; cursor: pointer; border-radius: 5px; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        /* HUD */
+        #ui-layer { position: absolute; top: 40px; width: 100%; text-align: center; pointer-events: none; z-index: 50; }
+        #timer { font-size: 50px; color: #333; font-weight: bold; display: none; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
+        #room-display { font-size: 14px; color: #555; background: rgba(255,255,255,0.7); padding: 5px 15px; border-radius: 15px; display: inline-block; border: 1px solid #ccc; }
+
+        /* ACTION BUTTONS */
+        .action-btn {
+            position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%);
+            padding: 20px 40px; font-size: 20px; font-weight: bold; color: #fff;
+            background: #555; border: 4px solid #fff; border-radius: 50px;
+            cursor: pointer; display: none; z-index: 60;
+            box-shadow: 0 0 30px rgba(0,0,0,0.3); animation: pulse 1s infinite alternate;
+        }
+        #sit-btn { background: #007bff; box-shadow: 0 0 30px rgba(0,123,255,0.4); top: 75%; color: #fff; }
+        #door-btn { background: #aa0000; box-shadow: 0 0 30px rgba(170,0,0,0.4); top: 50%; width: 250px; }
+
+        @keyframes pulse { from { transform: translate(-50%,-50%) scale(1); } to { transform: translate(-50%,-50%) scale(1.1); } }
+
+        /* CONTROLS - FLOATING JOYSTICK (Styling updated for clarity against lighter background) */
+        #zone-move { position: absolute; bottom: 0; left: 0; width: 50%; height: 100%; z-index: 10; }
+        #zone-look { position: absolute; bottom: 0; right: 0; width: 50%; height: 100%; z-index: 10; }
+        
+        /* Joystick UI (Hidden by default, shows on touch) */
+        #joy-container {
+            position: absolute; width: 120px; height: 120px; display: none; pointer-events: none; z-index: 20;
+            transform: translate(-50%, -50%); /* Centers the container on the touch point */
+        }
+        #joy-base {
+            width: 100%; height: 100%;
+            border: 2px solid rgba(0, 0, 0, 0.3); border-radius: 50%; 
+            background: rgba(0, 0, 0, 0.05);
+        }
+        #joy-stick {
+            position: absolute; top: 50%; left: 50%; width: 50px; height: 50px;
+            background: rgba(0, 0, 0, 0.6); border-radius: 50%; 
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px rgba(0,0,0,0.4);
+        }
+    </style>
+</head>
+<body>
+
+    <video id="skyVideo" loop muted playsinline style="display:none">
+        <source src="sky.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+
+    <div id="debug-console">Gallery System Ready.</div>
+
+    <div id="login-screen">
+        <h1>ART GALLERY PRO</h1>
+        <input type="text" id="username" placeholder="ENTER VIEWER NAME" maxlength="10">
+        <input type="number" id="room-code" placeholder="GALLERY ID (e.g. 1)" maxlength="5">
+        <button id="join-btn">ENTER GALLERY</button>
+    </div>
+
+    <div id="ui-layer">
+        <div id="timer" style="display: none;"></div> 
+        <div id="room-display">OFFLINE</div>
+    </div>
+
+    <button id="sit-btn" class="action-btn">🪑 REST</button>
+    <button id="door-btn" class="action-btn">🚪 OPEN DOOR</button>
+
+    <div id="zone-move"></div>
+    <div id="zone-look"></div>
+    
+    <div id="joy-container">
+        <div id="joy-base"></div>
+        <div id="joy-stick"></div>
+    </div>
+
+    <script type="importmap">
+        { "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+            "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
+        }}
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { initializeApp } from 'firebase/app';
+        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
+
+        // 1. CONFIG
+        const firebaseConfig = {
+            // NOTE: Keep your existing Firebase config here
+            apiKey: "AIzaSyC9rehsf-0jkb9dAeT1-0Z1C-yRJ0YI9dA",
+            authDomain: "gymnm-ce84b.firebaseapp.com",
+            projectId: "gymnm-ce84b",
+            storageBucket: "gymnm-ce84b.appspot.com",
+            messagingSenderId: "474926929394",
+            appId: "1:474926929394:web:6abdb807caba2751a5c76b",
+            measurementId: "G-6R9S8LYZNF"
+        };
+
+        const logDiv = document.getElementById('debug-console');
+        function log(msg) { console.log(msg); logDiv.innerText = "> " + msg; }
+
+        let db;
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            log("Firebase Initialized.");
+        } catch(e) { log("CONFIG ERROR: " + e.message); }
+
+        // 2. VARIABLES
+        const myId = 'player_' + Math.floor(Math.random() * 999999);
+        let myName = "Viewer";
+        let roomCode = "0";
+        let isPlaying = false;
+        let isSitting = false;
+        let otherPlayers = {}; 
+
+        // Door State
+        let isDoorOpen = false;
+        let doorMesh; 
+        const GAP_SIZE = 80; 
+        const DOOR_THICKNESS = 4;
+        const DOOR_WIDTH = GAP_SIZE; 
+        const DOOR_HEIGHT = 120; 
+        const DOOR_OPEN_POS = -DOOR_WIDTH; 
+        const DOOR_CLOSED_POS = 0; 
+        const DOOR_SPEED = 0.05; 
+        // Collision constants
+        const WALL_Z_POS = 0; 
+        const PLAYER_RADIUS = 10; 
+        const DOOR_LEFT_X = -(GAP_SIZE / 2); // -40
+        const DOOR_RIGHT_X = (GAP_SIZE / 2); // 40
+
+        // Chair Locations
+        const floorY = -50;
+        const chairY = floorY + 12; 
+        const chair1Pos = new THREE.Vector3(-100, chairY, -200); 
+        const chair2Pos = new THREE.Vector3(100, chairY, -200); 
+        let activeChair = null;
+
+        // 3. SCENE
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0f0f0);
+        scene.fog = new THREE.Fog(0xf0f0f0, 10, 800); 
+
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        // Lights
+        const ambLight = new THREE.AmbientLight(0xffffff, 1.0); scene.add(ambLight);
+        const pLight = new THREE.PointLight(0xffffff, 1.2, 800); pLight.position.set(0, 100, 0); scene.add(pLight); 
+
+        // 4. TEXTURES & MATERIALS
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.8, metalness: 0.0 });
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.6, metalness: 0.1 });
+        const ceilingMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, metalness: 0.0 });
+        const furnitureMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.1, metalness: 0.5 });
+        const wallMatInterior = new THREE.MeshStandardMaterial({ color: 0xddeeff, roughness: 0.8, metalness: 0.0, side: THREE.DoubleSide }); 
+        
+        // --- WINDOW & FURNITURE MATERIALS ---
+        const windowGlassMat = new THREE.MeshStandardMaterial({ 
+            color: 0xeeeeff, 
+            transparent: true, 
+            opacity: 0.2, 
+            side: THREE.DoubleSide 
+        }); // Translucent Glass
+        const curtainMat = new THREE.MeshStandardMaterial({ color: 0xcac7b8, roughness: 0.8, side: THREE.DoubleSide }); // Light beige curtain
+        const sofaMat = new THREE.MeshStandardMaterial({ color: 0xe3e3e3, roughness: 0.8, metalness: 0.0 }); // Off-white fabric for sofa
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.5 }); // Brown wood for chair/plant
+        const frameMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.5 }); // Black frame
+
+        // 5. VIDEO TEXTURE SETUP
+        const video = document.getElementById('skyVideo');
+        const videoTexture = new THREE.VideoTexture(video);
+        videoTexture.minFilter = THREE.LinearFilter;
+        videoTexture.magFilter = THREE.LinearFilter;
+        videoTexture.format = THREE.RGBAFormat;
+        videoTexture.wrapS = THREE.ClampToEdgeWrapping; 
+        videoTexture.wrapT = THREE.ClampToEdgeWrapping; 
+
+        const VIDEO_ASPECT = 16 / 9;
+        const GEOMETRY_ASPECT = 800 / 400; 
+        const V_REPEAT_FACTOR = GEOMETRY_ASPECT / VIDEO_ASPECT;
+        videoTexture.repeat.set(1.0, V_REPEAT_FACTOR);
+        videoTexture.offset.set(0.0, (1 - V_REPEAT_FACTOR) / 2);
+
+        const videoCeilingMat = new THREE.MeshStandardMaterial({ 
+            map: videoTexture,
+            side: THREE.FrontSide, 
+            emissive: 0xffffff,    
+            emissiveMap: videoTexture,
+            emissiveIntensity: 0.8 
+        });
+        
+        let squareCount = 1;
+        function createNumTex(n) {
+            const c=document.createElement('canvas'); c.width=128; c.height=128; const x=c.getContext('2d');
+            x.fillStyle='#fff'; x.fillRect(0,0,128,128); 
+            x.strokeStyle='#333'; x.lineWidth=4; x.strokeRect(0,0,128,128); 
+            x.fillStyle='#a00'; x.font='bold 40px Arial'; x.textAlign='center'; x.textBaseline='middle'; 
+            x.fillText(`Art #${n}`, 64, 64); 
+            return new THREE.CanvasTexture(c);
+        }
+
+        // 6. BUILD ROOM & FURNITURE
+        const galleryObjects = []; 
+        
+        const W=800, H=800; // Total Width and Depth
+        const T=200; // Room/Wall Height
+        const ROOM_SIZE = 400; // Depth of one room
+        const maxPos = W/2 - 10; 
+
+        const CEILING_Y = floorY + T; // 150
+        const WALL_CENTER_Y = floorY + T/2; // 50
+        
+        // --- WINDOW CONFIG ---
+        const WINDOW_PANEL_W = 100; // Width of one glass panel
+        const W_W = WINDOW_PANEL_W * 3 + 15; // Total window width (315)
+        const W_H = 150; // Window height
+        const W_D = 30; // Recess depth
+        const BACK_Z = -400;
+
+
+        // --- CUSTOM WALL BUILDER FOR BAY WINDOW CUTOUT ---
+        function buildWallWithCutout(w, h, pz) {
+            const windowStart = -W_W/2; // X start (-157.5)
+            const windowEnd = W_W/2; // X end (157.5)
+            const windowBottom = floorY + 30; // Y start (-20)
+            const windowTop = floorY + 180; // Y end (130)
+
+            const WALL_CENTER_Y = floorY + T/2; // 50
+
+            const wallGroup = new THREE.Group();
+            wallGroup.position.set(0, WALL_CENTER_Y, pz);
+
+            // Left wall segment (Wall to the left of the cutout)
+            const leftW = w/2 + windowStart;
+            const leftH = h;
+            const leftMesh = new THREE.Mesh(new THREE.PlaneGeometry(leftW, leftH), wallMat);
+            leftMesh.position.x = windowStart - leftW/2;
+            wallGroup.add(leftMesh); galleryObjects.push(leftMesh);
+
+            // Right wall segment (Wall to the right of the cutout)
+            const rightW = w/2 - windowEnd;
+            const rightH = h;
+            const rightMesh = new THREE.Mesh(new THREE.PlaneGeometry(rightW, rightH), wallMat);
+            rightMesh.position.x = windowEnd + rightW/2;
+            wallGroup.add(rightMesh); galleryObjects.push(rightMesh);
+
+            // Top beam (Wall above the cutout)
+            const topH = h - (windowTop - windowBottom);
+            const topYOffset = windowTop + (topH / 2) - WALL_CENTER_Y;
+            const topMesh = new THREE.Mesh(new THREE.PlaneGeometry(windowEnd - windowStart, topH), wallMat);
+            topMesh.position.y = topYOffset;
+            wallGroup.add(topMesh); galleryObjects.push(topMesh);
+
+            // Bottom support (Wall below the cutout)
+            const bottomH = windowBottom - floorY;
+            const bottomYOffset = floorY + (bottomH / 2) - WALL_CENTER_Y;
+            const bottomMesh = new THREE.Mesh(new THREE.PlaneGeometry(windowEnd - windowStart, bottomH), wallMat);
+            bottomMesh.position.y = bottomYOffset;
+            wallGroup.add(bottomMesh); galleryObjects.push(bottomMesh);
+            
+            scene.add(wallGroup);
+        }
+
+        // --- BAY WINDOW AND FURNITURE SCENE ---
+        function createBayWindowScene() {
+            const group = new THREE.Group();
+
+            // 1. EXTERNAL VIEW PLANE (Sky video visible through glass)
+            const viewPlaneGeo = new THREE.PlaneGeometry(W_W * 2, W_H * 2);
+            const viewPlaneMat = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.FrontSide });
+            const viewPlane = new THREE.Mesh(viewPlaneGeo, viewPlaneMat);
+            viewPlane.position.set(0, WALL_CENTER_Y, BACK_Z - W_D - 5); // 5 units outside recess
+            group.add(viewPlane);
+
+            // 2. WINDOW RECESS AND FRAME
+            const frameThickness = 5;
+            const glassThickness = 1;
+            const frameDepth = W_D / 2; 
+
+            // Recess walls (Inside the cutout)
+            const recessMat = wallMatInterior.clone();
+            recessMat.color.set(0xdddddd); 
+
+            // Recess Top
+            const recessTop = new THREE.Mesh(new THREE.BoxGeometry(W_W, frameThickness, W_D), recessMat);
+            recessTop.position.set(0, WALL_CENTER_Y + W_H/2 + frameThickness/2, BACK_Z - W_D/2);
+            group.add(recessTop);
+
+            // Recess Bottom/Sill (Sticks out a bit)
+            const sillDepth = W_D + 15;
+            const sillMat = new THREE.MeshStandardMaterial({ color: 0xb5b5b5, roughness: 0.4 });
+            const sill = new THREE.Mesh(new THREE.BoxGeometry(W_W + 10, 5, sillDepth), sillMat);
+            sill.position.set(0, WALL_CENTER_Y - W_H/2 - 2, BACK_Z + sillDepth/2 - W_D);
+            group.add(sill);
+
+            // Inner Bay Window Frame (Black color)
+            for (let i = 0; i < 3; i++) {
+                const xOffset = -W_W/2 + (i * WINDOW_PANEL_W) + (WINDOW_PANEL_W/2);
+                
+                // Glass Pane
+                const glassGeo = new THREE.PlaneGeometry(WINDOW_PANEL_W - frameThickness, W_H - frameThickness);
+                const glass = new THREE.Mesh(glassGeo, windowGlassMat);
+                glass.position.set(xOffset, WALL_CENTER_Y, BACK_Z - W_D + glassThickness);
+                group.add(glass);
+
+                // Frame bars (Grid pattern for each pane)
+                const barGeoV = new THREE.BoxGeometry(frameThickness/2, W_H - frameThickness, frameThickness/2);
+                const barGeoH = new THREE.BoxGeometry(WINDOW_PANEL_W - frameThickness, frameThickness/2, frameThickness/2);
+                
+                // Horizontal bar
+                const hBar = new THREE.Mesh(barGeoH, frameMat);
+                hBar.position.set(xOffset, WALL_CENTER_Y, BACK_Z - W_D + frameThickness);
+                group.add(hBar);
+
+                // Vertical bar
+                const vBar = new THREE.Mesh(barGeoV, frameMat);
+                vBar.position.set(xOffset, WALL_CENTER_Y, BACK_Z - W_D + frameThickness);
+                group.add(vBar);
+            }
+            
+            // Vertical Separators (Black)
+            for (let i = 0; i <= 3; i++) {
+                const xOffset = -W_W/2 + (i * WINDOW_PANEL_W);
+                const vSep = new THREE.Mesh(new THREE.BoxGeometry(frameThickness, W_H + frameThickness, frameDepth), frameMat);
+                vSep.position.set(xOffset, WALL_CENTER_Y, BACK_Z - frameDepth/2);
+                group.add(vSep);
+            }
+
+            // Top/Bottom (Black)
+            const hSepGeo = new THREE.BoxGeometry(W_W + frameThickness, frameThickness, frameDepth);
+            const hSepTop = new THREE.Mesh(hSepGeo, frameMat);
+            hSepTop.position.set(0, WALL_CENTER_Y + W_H/2 + frameThickness/2, BACK_Z - frameDepth/2);
+            group.add(hSepTop);
+            const hSepBottom = new THREE.Mesh(hSepGeo, frameMat);
+            hSepBottom.position.set(0, WALL_CENTER_Y - W_H/2 - frameThickness/2, BACK_Z - frameDepth/2);
+            group.add(hSepBottom);
+
+
+            // 3. CURTAINS (Beige, slightly open)
+            const curtainWidth = W_W * 0.4;
+            const curtainHeight = T;
+            
+            // Left Curtain
+            const cL = new THREE.Mesh(new THREE.PlaneGeometry(curtainWidth, curtainHeight), curtainMat);
+            cL.position.set(-W_W/2 - curtainWidth/2 - 10, WALL_CENTER_Y, BACK_Z + 1); 
+            group.add(cL);
+            
+            // Right Curtain
+            const cR = new THREE.Mesh(new THREE.PlaneGeometry(curtainWidth, curtainHeight), curtainMat);
+            cR.position.set(W_W/2 + curtainWidth/2 + 10, WALL_CENTER_Y, BACK_Z + 1);
+            group.add(cR);
+
+
+            // 4. FURNITURE (Realistic Chair & Table)
+            const furnitureZ = BACK_Z + 150; 
+            
+            // Chair (Off-white/Beige fabric look)
+            const chairGroup = new THREE.Group();
+            // Seat
+            const seat = new THREE.Mesh(new THREE.BoxGeometry(60, 10, 60), sofaMat);
+            seat.position.y = floorY + 30;
+            chairGroup.add(seat);
+            // Backrest
+            const back = new THREE.Mesh(new THREE.BoxGeometry(60, 40, 5), sofaMat);
+            back.position.set(0, floorY + 55, -25);
+            chairGroup.add(back);
+            // Legs (Simplified)
+            for(let i=-1; i<=1; i+=2) {
+                for(let j=-1; j<=1; j+=2) {
+                    const leg = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 20), woodMat);
+                    leg.position.set(i * 25, floorY + 10, j * 25);
+                    chairGroup.add(leg);
+                }
+            }
+            
+            chairGroup.position.set(0, 0, furnitureZ);
+            chairGroup.rotation.y = Math.PI; // Face the window
+            group.add(chairGroup);
+
+
+            // Side Table (Marble Look)
+            const tableMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1, metalness: 0.1 });
+            const tableHeight = 40;
+            
+            const table = new THREE.Mesh(new THREE.CylinderGeometry(15, 15, tableHeight, 32), tableMat);
+            table.position.set(W_W/2, floorY + tableHeight/2, furnitureZ);
+            group.add(table);
+            
+            
+            // Small Plant
+            const plantGroup = new THREE.Group();
+            const basket = new THREE.Mesh(new THREE.CylinderGeometry(20, 25, 20, 16), woodMat);
+            basket.position.y = floorY + 10;
+            plantGroup.add(basket);
+            
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 40, 8), woodMat);
+            trunk.position.y = floorY + 40;
+            plantGroup.add(trunk);
+            
+            const leaves = new THREE.Mesh(new THREE.SphereGeometry(10, 16, 16), new THREE.MeshStandardMaterial({ color: 0x228b22 }));
+            leaves.position.y = floorY + 60;
+            plantGroup.add(leaves);
+            
+            plantGroup.position.set(-W_W/2, 0, furnitureZ);
+            group.add(plantGroup);
+
+
+            scene.add(group);
+            galleryObjects.push(group);
+        }
+
+        // --- Standard Wall Builder (Reverted to simple grid) ---
+        function buildWallGroup(w, h, px, py, pz, rx, ry, material, isExterior) {
+            const g = new THREE.Group();
+            g.position.set(px, py, pz);
+            g.rotation.set(rx, ry, 0);
+            
+            const cols = Math.ceil(w/50);
+            const rows = Math.ceil(h/50);
+            
+            const finalWidth = w % 50 === 0 ? 50 : w % 50;
+            const finalHeight = h % 50 === 0 ? 50 : h % 50;
+            
+            for(let i=0; i<cols; i++) {
+                for(let j=0; j<rows; j++) {
+                    let panelW = (i === cols - 1 && finalWidth !== 50) ? finalWidth : 50;
+                    let panelH = (j === rows - 1 && finalHeight !== 50) ? finalHeight : 50;
+                    
+                    let m;
+                    if (material === wallMat && isExterior) { 
+                        const tex = createNumTex(squareCount++);
+                        m = new THREE.Mesh(new THREE.PlaneGeometry(panelW, panelH), new THREE.MeshStandardMaterial({map: tex}));
+                    } else {
+                         m = new THREE.Mesh(new THREE.PlaneGeometry(panelW, panelH), material);
+                    }
+                    
+                    m.position.set((i*50)-w/2+(panelW/2), (j*50)-h/2+(panelH/2), 0);
+                    g.add(m); 
+                    galleryObjects.push(m);
+                }
+            }
+            scene.add(g);
+        }
+
+        // --- GALLERY BUILD ---
+        const HALF_W = W/2;
+        const HALF_H = H/2;
+        
+        // Floor (Y=-50)
+        buildWallGroup(W,H, 0,-50,0, -Math.PI/2,0, floorMat, false); 
+        
+        // CEILING
+        function createVideoCeiling() {
+            const geometry = new THREE.PlaneGeometry(W, ROOM_SIZE, 10, 10); 
+            const mesh1 = new THREE.Mesh(geometry, videoCeilingMat);
+            mesh1.position.set(0, CEILING_Y, -ROOM_SIZE / 2); 
+            mesh1.rotation.x = Math.PI / 2;
+            scene.add(mesh1); galleryObjects.push(mesh1);
+
+            const videoCeilingMat2 = videoCeilingMat.clone();
+            const mesh2 = new THREE.Mesh(geometry, videoCeilingMat2); 
+            mesh2.position.set(0, CEILING_Y, ROOM_SIZE / 2); 
+            mesh2.rotation.x = Math.PI / 2; 
+            scene.add(mesh2); galleryObjects.push(mesh2);
+        }
+        createVideoCeiling();
+        
+        // Walls - All are Exterior walls
+        // ⭐ BACK WALL (Z = -400) - Custom build with cutout
+        buildWallWithCutout(W,T, BACK_Z);
+        createBayWindowScene(); // Add the window and furniture
+        
+        // Front Wall: Z = 400 (Standard)
+        buildWallGroup(W,T, 0,WALL_CENTER_Y,HALF_H, 0,Math.PI, wallMat, true);
+        
+        // Left Wall: X = -400 (Standard)
+        buildWallGroup(H,T, -HALF_W,WALL_CENTER_Y,0, 0,Math.PI/2, wallMat, true);
+        
+        // Right Wall: X = 400 (Standard)
+        buildWallGroup(H,T, HALF_W,WALL_CENTER_Y,0, 0,-Math.PI/2, wallMat, true);
+
+        // --- CENTRAL DIVIDING WALL (Unchanged) ---
+        const wallHeight = T; 
+        
+        const wallSegmentWidth = HALF_W - GAP_SIZE/2; // 360
+        const wallSegmentCenter = HALF_W/2 + GAP_SIZE/4; // 220
+        
+        buildWallGroup(wallSegmentWidth, wallHeight, -wallSegmentCenter, WALL_CENTER_Y, 0, 0, 0, wallMatInterior, false);
+        buildWallGroup(wallSegmentWidth, wallHeight, wallSegmentCenter, WALL_CENTER_Y, 0, 0, 0, wallMatInterior, false);
+
+        const frameHeight = wallHeight - DOOR_HEIGHT; 
+        buildWallGroup(GAP_SIZE, frameHeight, 0, floorY + DOOR_HEIGHT + frameHeight/2, 0, 0, 0, wallMatInterior, false);
+
+        const sleeveDepth = DOOR_THICKNESS + 2; 
+        const sleeveLength = DOOR_WIDTH * 1.5; 
+        
+        const sleeveWallGeo = new THREE.BoxGeometry(2, wallHeight, sleeveDepth);
+        const sleeveWall = new THREE.Mesh(sleeveWallGeo, wallMatInterior);
+        sleeveWall.position.set(DOOR_LEFT_X - sleeveLength, WALL_CENTER_Y, 0); 
+        scene.add(sleeveWall); galleryObjects.push(sleeveWall);
+
+        const sleeveTopBottomGeo = new THREE.BoxGeometry(sleeveLength * 2, 2, sleeveDepth);
+        
+        const sleeveTop = new THREE.Mesh(sleeveTopBottomGeo, wallMatInterior);
+        sleeveTop.position.set(DOOR_LEFT_X - sleeveLength + GAP_SIZE/2, floorY + DOOR_HEIGHT, 0); 
+        scene.add(sleeveTop); galleryObjects.push(sleeveTop);
+        
+        const sleeveBottom = new THREE.Mesh(sleeveTopBottomGeo, wallMatInterior);
+        sleeveBottom.position.set(DOOR_LEFT_X - sleeveLength + GAP_SIZE/2, floorY, 0); 
+        scene.add(sleeveBottom); galleryObjects.push(sleeveBottom);
+        
+        const doorGeo = new THREE.BoxGeometry(DOOR_WIDTH, DOOR_HEIGHT, DOOR_THICKNESS + 0.1); 
+        doorMesh = new THREE.Mesh(doorGeo, wallMatInterior); 
+        doorMesh.position.set(DOOR_CLOSED_POS, floorY + DOOR_HEIGHT/2, 0); 
+        scene.add(doorMesh);
+        
+        // 7. FURNITURE (Remaining Pedestals & Chairs)
+        function createFurniture() {
+            const g = new THREE.Group();
+            
+            // Pedestals 
+            const leg1 = new THREE.Mesh(new THREE.CylinderGeometry(3,3,30,16), furnitureMat);
+            leg1.position.set(0, floorY + 15, -200); g.add(leg1); galleryObjects.push(leg1);
+            const top1 = new THREE.Mesh(new THREE.CylinderGeometry(35,35,2,32), furnitureMat);
+            top1.position.set(0, floorY + 30, -200); g.add(top1); galleryObjects.push(top1);
+            const sculpture1 = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshStandardMaterial({color: 0xaa00aa, roughness: 0.1, metalness: 0.8}));
+            sculpture1.position.set(0, floorY + 35, -200); g.add(sculpture1); galleryObjects.push(sculpture1);
+
+            const leg2 = new THREE.Mesh(new THREE.CylinderGeometry(3,3,30,16), furnitureMat);
+            leg2.position.set(0, floorY + 15, 200); g.add(leg2); galleryObjects.push(leg2);
+            const top2 = new THREE.Mesh(new THREE.CylinderGeometry(35,35,2,32), furnitureMat);
+            top2.position.set(0, floorY + 30, 200); g.add(top2); galleryObjects.push(top2);
+            const sculpture2 = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshStandardMaterial({color: 0x00aaff, roughness: 0.1, metalness: 0.8}));
+            sculpture2.position.set(0, floorY + 35, 200); g.add(sculpture2); galleryObjects.push(sculpture2);
+
+
+            // Function to make chair/bench
+            function makeChair(xPos, zPos) {
+                const cg = new THREE.Group();
+                const seat = new THREE.Mesh(new THREE.BoxGeometry(14, 2, 14), furnitureMat);
+                seat.position.set(xPos, floorY + 15, zPos); cg.add(seat); galleryObjects.push(seat);
+                
+                const back = new THREE.Mesh(new THREE.BoxGeometry(2, 16, 14), furnitureMat);
+                const backX = xPos > 0 ? xPos + 7 : xPos - 7;
+                back.position.set(backX, floorY + 22, zPos); cg.add(back); galleryObjects.push(back);
+                
+                const cleg = new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,15,8), furnitureMat);
+                cleg.position.set(xPos, floorY + 7.5, zPos); cg.add(cleg); galleryObjects.push(cleg);
+                return cg;
+            }
+
+            g.add(makeChair(-100, -200)); 
+            g.add(makeChair(100, -200));  
+            scene.add(g);
+        }
+        createFurniture();
+
+        // 8. LOGIC 
+        document.getElementById('join-btn').addEventListener('click', () => {
+            const u = document.getElementById('username').value.trim();
+            const r = document.getElementById('room-code').value.trim();
+            if(!u || !r) return alert("Enter Name & Code");
+            myName = u; roomCode = "room_" + r;
+            document.getElementById('login-screen').style.display='none';
+            document.getElementById('room-display').innerText=`GALLERY: ${r}`;
+            isPlaying=true;
+            
+            // CRITICAL FIX: Start video playback here, upon user interaction.
+            video.play().catch(e => log("Video playback failed on start: " + e.message + ". Check video path (sky.mp4) or server configuration."));
+
+            initMultiplayer();
+        });
+
+        function initMultiplayer() {
+            const roomRef = doc(db, "rooms", roomCode);
+            const playersRef = collection(db, "rooms", roomCode, "players");
+
+            onSnapshot(roomRef, (snap) => {
+                if(!snap.exists()) { 
+                    setDoc(roomRef, {doorOpen:false}); 
+                    return; 
+                }
+                const d = snap.data();
+                
+                if(d.doorOpen !== isDoorOpen) {
+                    isDoorOpen = d.doorOpen;
+                    document.getElementById('door-btn').innerText = isDoorOpen ? "🚪 CLOSE DOOR" : "🚪 OPEN DOOR";
+                }
+            });
+
+            onSnapshot(playersRef, (snap) => {
+                const now = Date.now();
+                snap.forEach(d => {
+                    const p = d.data();
+                    if(now - p.time > 10000) return;
+                    if(d.id === myId) return;
+                    if(!otherPlayers[d.id]) {
+                        const g = new THREE.Group();
+                        const b = new THREE.Mesh(new THREE.CapsuleGeometry(6,20,4,8), new THREE.MeshStandardMaterial({color:0x888888}));
+                        g.add(b);
+                        const c=document.createElement('canvas'); c.width=256; c.height=64;
+                        const ctx=c.getContext('2d'); ctx.font="bold 30px Arial"; ctx.fillStyle="#333"; ctx.textAlign="center"; ctx.fillText(p.name,128,40);
+                        const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c)}));
+                        s.position.y=25; s.scale.set(20,5,1); g.add(s);
+                        scene.add(g);
+                        otherPlayers[d.id] = { mesh:g, tPos: new THREE.Vector3(p.x,p.y,p.z), tRot: p.ry };
+                        g.position.set(p.x,p.y,p.z);
+                    } else {
+                        otherPlayers[d.id].tPos.set(p.x,p.y,p.z);
+                        otherPlayers[d.id].tRot = p.ry;
+                    }
+                });
+                Object.keys(otherPlayers).forEach(id => {
+                    if(!snap.docs.find(d => d.id === id)) { scene.remove(otherPlayers[id].mesh); delete otherPlayers[id]; }
+                });
+            });
+
+            setInterval(() => {
+                if(isPlaying) setDoc(doc(playersRef, myId), {
+                    x:camera.position.x, y:camera.position.y-10, z:camera.position.z,
+                    ry:camera.rotation.y, name:myName, time:Date.now()
+                }).catch(()=>{});
+            }, 100);
+        }
+        
+        // --- DOOR INTERACTION (Unchanged) ---
+        const doorBtn = document.getElementById('door-btn');
+        doorBtn.addEventListener('click', () => {
+            const newState = !isDoorOpen;
+            updateDoc(doc(db, "rooms", roomCode), {doorOpen: newState});
+        });
+
+        // --- SIT INTERACTION (Unchanged) ---
+        const sitBtn = document.getElementById('sit-btn');
+        
+        sitBtn.addEventListener('click', () => {
+            if(isSitting) {
+                isSitting = false;
+                sitBtn.style.display = "none";
+                sitBtn.innerText = "🪑 REST";
+                const offset = activeChair === 1 ? 15 : -15;
+                camera.position.x += offset; 
+                camera.position.y = 0; 
+            } else {
+                if(!activeChair) return;
+                isSitting = true;
+                sitBtn.innerText = "🏃 RESUME VIEWING";
+                const target = activeChair === 1 ? chair1Pos : chair2Pos;
+                
+                camera.position.set(target.x, -5, target.z);
+                camera.lookAt(0, -20, -200); 
+            }
+        });
+
+        // --- JOYSTICK CONTROLS (Unchanged) ---
+        let joyId=null, lookId=null;
+        let move={x:0,y:0}, lastLook={x:0,y:0};
+        
+        const joyContainer = document.getElementById('joy-container');
+        const joyStick = document.getElementById('joy-stick');
+        let joyStart = {x:0, y:0};
+
+        const zoneMove = document.getElementById('zone-move');
+        zoneMove.addEventListener('touchstart', e => {
+            e.preventDefault();
+            if(joyId !== null) return;
+            const touch = e.changedTouches[0];
+            joyId = touch.identifier;
+            joyStart = { x: touch.clientX, y: touch.clientY };
+            joyContainer.style.display = 'block';
+            joyContainer.style.left = touch.clientX + 'px';
+            joyContainer.style.top = touch.clientY + 'px';
+            joyStick.style.transform = `translate(-50%, -50%)`;
+            move = {x:0, y:0};
+        }, {passive:false});
+
+        zoneMove.addEventListener('touchmove', e => {
+            e.preventDefault();
+            for(let i=0; i<e.changedTouches.length; i++) {
+                if(e.changedTouches[i].identifier === joyId) {
+                    const t = e.changedTouches[i];
+                    let dx = t.clientX - joyStart.x;
+                    let dy = t.clientY - joyStart.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    const maxDist = 60;
+                    if(dist > maxDist) {
+                        const ratio = maxDist / dist;
+                        dx *= ratio;
+                        dy *= ratio;
+                    }
+                    joyStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                    move.x = dx / maxDist;
+                    move.y = dy / maxDist;
+                }
+            }
+        }, {passive:false});
+
+        zoneMove.addEventListener('touchend', e => {
+            for(let i=0; i<e.changedTouches.length; i++) {
+                if(e.changedTouches[i].identifier === joyId) {
+                    joyId = null;
+                    move = {x:0, y:0};
+                    joyContainer.style.display = 'none';
+                }
+            }
+        });
+
+        const zoneLook = document.getElementById('zone-look');
+        zoneLook.addEventListener('touchstart', e => {
+            e.preventDefault();
+            if(lookId !== null) return;
+            const t = e.changedTouches[0];
+            lookId = t.identifier;
+            lastLook = {x: t.clientX, y: t.clientY};
+        }, {passive:false});
+
+        zoneLook.addEventListener('touchmove', e => {
+            e.preventDefault();
+            for(let i=0; i<e.changedTouches.length; i++) {
+                if(e.changedTouches[i].identifier === lookId) {
+                    const t = e.changedTouches[i];
+                    const dx = t.clientX - lastLook.x;
+                    const dy = t.clientY - lastLook.y;
+                    camera.rotation.y -= dx * 0.004;
+                    camera.rotation.x -= dy * 0.004;
+                    camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x));
+                    lastLook = {x: t.clientX, y: t.clientY};
+                }
+            }
+        }, {passive:false});
+
+        zoneLook.addEventListener('touchend', e => {
+            for(let i=0; i<e.changedTouches.length; i++) {
+                if(e.changedTouches[i].identifier === lookId) lookId = null;
+            }
+        });
+
+
+        // --- ANIMATION ---
+        camera.position.set(0,0,100);
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 1. VIDEO UPDATE
+            if (video.readyState >= video.HAVE_CURRENT_DATA) {
+                videoTexture.needsUpdate = true;
+            }
+
+            // 2. DOOR ANIMATION
+            const targetX = isDoorOpen ? DOOR_OPEN_POS : DOOR_CLOSED_POS; 
+            const currentX = doorMesh.position.x;
+            doorMesh.position.x += (targetX - currentX) * DOOR_SPEED;
+
+            if(!isSitting && (move.x!==0 || move.y!==0)) {
+                const oldX = camera.position.x;
+                const oldZ = camera.position.z;
+
+                const fwd = new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0), camera.rotation.y);
+                const rgt = new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0), camera.rotation.y);
+                camera.position.addScaledVector(fwd, -move.y*4);
+                camera.position.addScaledVector(rgt, move.x*4);
+                
+                // Outer wall bounds (800x800 room)
+                camera.position.x = Math.max(-maxPos, Math.min(maxPos, camera.position.x));
+                camera.position.z = Math.max(-maxPos, Math.min(maxPos, camera.position.z));
+                
+                // 3. CENTRAL WALL COLLISION CHECK
+                const playerZ = camera.position.z;
+                const playerX = camera.position.x;
+                
+                if (Math.abs(playerZ - WALL_Z_POS) < PLAYER_RADIUS) {
+                    
+                    const isOutsideDoorway = playerX < DOOR_LEFT_X || playerX > DOOR_RIGHT_X;
+
+                    if (!isDoorOpen || isOutsideDoorway) { 
+                        
+                        if (oldZ < WALL_Z_POS && playerZ > WALL_Z_POS) {
+                            camera.position.z = WALL_Z_POS - PLAYER_RADIUS;
+                        } else if (oldZ > WALL_Z_POS && playerZ < WALL_Z_POS) {
+                            camera.position.z = WALL_Z_POS + PLAYER_RADIUS;
+                        }
+                    }
+                }
+            }
+
+            // Show door button if near the door
+            if (camera.position.z > -150 && camera.position.z < 150 && camera.position.x > -100 && camera.position.x < 100 && !isSitting) {
+                doorBtn.style.display = "block";
+            } else {
+                doorBtn.style.display = "none";
+            }
+
+            // Chair interaction logic
+            if(isPlaying && !isSitting) {
+                const dist1 = camera.position.distanceTo(new THREE.Vector3(chair1Pos.x, 0, chair1Pos.z));
+                const dist2 = camera.position.distanceTo(new THREE.Vector3(chair2Pos.x, 0, chair2Pos.z));
+                // Note: The new furniture scene at Z=-250 might interfere with the original chair at Z=-200
+                // For simplicity, we keep the original chairs for the Sit feature
+                if(dist1 < 30) { activeChair = 1; sitBtn.style.display = "block"; }
+                else if(dist2 < 30) { activeChair = 2; sitBtn.style.display = "block"; }
+                else { activeChair = null; sitBtn.style.display = "none"; }
+            }
+
+            for(let id in otherPlayers) {
+                const p = otherPlayers[id];
+                p.mesh.position.lerp(p.tPos, 0.1);
+                p.mesh.rotation.y += (p.tRot - p.mesh.rotation.y)*0.1;
+            }
+
+            document.getElementById('timer').style.display='none';
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('beforeunload', () => deleteDoc(doc(db, "rooms", roomCode, "players", myId)));
+    </script>
+</body>
+</html>
