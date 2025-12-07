@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Art Gallery Pro - Real-Time God Mode Edition (Exit Fixed)</title>
+    <title>Art Gallery Pro - God Mode Edition (Smoother)</title>
     <style>
         /* Base Styling */
         body { margin: 0; overflow: hidden; background-color: #f0f0f0; touch-action: none; font-family: 'Georgia', serif; user-select: none; -webkit-user-select: none; }
@@ -34,81 +34,20 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
 
-        /* HUD - Top Bar */
-        #ui-layer { 
-            position: absolute; top: 10px; width: 100%; pointer-events: none; z-index: 50; 
-            display: flex; justify-content: space-between; align-items: flex-start; padding: 0 10px;
-        }
-        #room-display { 
-            font-size: 14px; color: #555; background: rgba(255,255,255,0.7); 
-            padding: 5px 15px; border-radius: 15px; display: inline-block; border: 1px solid #ccc; 
-            pointer-events: auto;
-        }
-
-        /* PLAYER LIST & MAP CONTAINER (Top Left) */
-        #info-container {
-            display: flex;
-            flex-direction: column;
-            pointer-events: auto;
-        }
-        
-        #player-list-box {
-            background: rgba(0,0,0,0.7);
-            color: #fff;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            margin-bottom: 10px;
-            max-height: 150px;
-            overflow-y: auto;
-            min-width: 150px;
-        }
-        #player-list-box h3 {
-            margin: 0 0 5px 0;
-            font-size: 14px;
-            color: #ffd700;
-            border-bottom: 1px solid #444;
-            padding-bottom: 3px;
-        }
-        #player-list-box ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        #player-list-box ul li {
-            padding: 2px 0;
-        }
-
-        /* MINIMAP STYLING */
-        #minimap-canvas {
-            border: 2px solid #333;
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 5px;
-            display: none; /* Starts hidden, shown after join */
-        }
-        
+        /* HUD */
+        #ui-layer { position: absolute; top: 40px; width: 100%; text-align: center; pointer-events: none; z-index: 50; }
+        #room-display { font-size: 14px; color: #555; background: rgba(255,255,255,0.7); padding: 5px 15px; border-radius: 15px; display: inline-block; border: 1px solid #ccc; }
 
         /* ACTION BUTTONS */
         .action-btn {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%);
             padding: 20px 40px; font-size: 20px; font-weight: bold; color: #fff;
             background: #555; border: 4px solid #fff; border-radius: 50px;
             cursor: pointer; display: none; z-index: 60;
             box-shadow: 0 0 30px rgba(0,0,0,0.3); animation: pulse 1s infinite alternate;
-            pointer-events: auto; 
         }
         #door-btn { background: #aa0000; box-shadow: 0 0 30px rgba(170,0,0,0.4); top: 50%; width: 250px; }
         #close-window-btn { background: #008080; box-shadow: 0 0 30px rgba(0,128,128,0.4); top: 75%; width: 250px; }
-        
-        /* EXIT BUTTON STYLING (Top Right) */
-        #exit-btn {
-            padding: 10px 20px; background: #ff4444; color: #fff; border: none;
-            font-weight: bold; font-size: 16px; cursor: pointer; border-radius: 5px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            pointer-events: auto; 
-            margin-left: auto; 
-        }
-
 
         @keyframes pulse { from { transform: translate(-50%,-50%) scale(1); } to { transform: translate(-50%,-50%) scale(1.1); } }
 
@@ -135,7 +74,8 @@
     </style>
 </head>
 <body>
-    <video id="skyVideo" loop playsinline style="display:none" preload="auto">
+
+    <video id="skyVideo" loop playsinline muted style="display:none" preload="auto">
         <source src="sky.mp4" type="video/mp4">
         Your browser does not support the video tag.
     </video>
@@ -143,25 +83,15 @@
     <div id="debug-console">Gallery System Ready.</div>
 
     <div id="login-screen">
-        <h1>ART GALLERY PRO - REAL-TIME GOD MODE</h1>
+        <h1>ART GALLERY PRO - GOD MODE</h1>
         <input type="text" id="username" placeholder="ENTER VIEWER NAME" maxlength="10">
         <input type="number" id="room-code" placeholder="GALLERY ID (e.g. 1)" maxlength="5">
         <button id="join-btn">ENTER GALLERY</button>
     </div>
 
     <div id="ui-layer">
-        <div id="info-container">
-            <div id="player-list-box" style="display: none;">
-                <h3 id="player-count">Viewers (0)</h3>
-                <ul id="player-list"></ul>
-            </div>
-            <canvas id="minimap-canvas" width="150" height="150"></canvas>
-        </div>
-
-        <div id="room-info" style="display: flex; flex-direction: column; align-items: flex-end;">
-            <div id="room-display">OFFLINE</div>
-            <button id="exit-btn" style="display: none;">❌ EXIT GALLERY</button>
-        </div>
+        <div id="timer" style="display: none;"></div> 
+        <div id="room-display">OFFLINE</div>
     </div>
 
     <button id="door-btn" class="action-btn">🚪 OPEN DOOR</button>
@@ -186,19 +116,19 @@
     <script type="module">
         import * as THREE from 'three';
         import { initializeApp } from 'firebase/app';
-        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, deleteDoc, getDoc } from 'firebase/firestore'; 
+        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
 
         // 1. CONFIG
-        const firebaseConfig = {
-          apiKey: "AIzaSyBDBH0OI_4y2lhONsUwzla987CJdyqafPE",
-          authDomain: "haij-7e2f3.firebaseapp.com",
-          databaseURL: "https://haij-7e2f3-default-rtdb.asia-southeast1.firebasedatabase.app",
-          projectId: "haij-7e2f3",
-          storageBucket: "haij-7e2f3.firebasestorage.app",
-          messagingSenderId: "1071439646863",
-          appId: "1:1071439646863:web:5dc1650e1dabbe9de0e0fa",
-          measurementId: "G-CXVGW0NMLP"
-        };
+const firebaseConfig = {
+  apiKey: "AIzaSyBDBH0OI_4y2lhONsUwzla987CJdyqafPE",
+  authDomain: "haij-7e2f3.firebaseapp.com",
+  databaseURL: "https://haij-7e2f3-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "haij-7e2f3",
+  storageBucket: "haij-7e2f3.firebasestorage.app",
+  messagingSenderId: "1071439646863",
+  appId: "1:1071439646863:web:5dc1650e1dabbe9de0e0fa",
+  measurementId: "G-CXVGW0NMLP"
+};
 
         const logDiv = document.getElementById('debug-console');
         function log(msg) { console.log(msg); logDiv.innerText = "> " + msg; }
@@ -211,24 +141,23 @@
         } catch(e) { log("CONFIG ERROR: Firebase initialization failed: " + e.message); }
 
         // 2. VARIABLES
-        const myId = 'player_' + Math.floor(Math.random() * 999999); 
+        const myId = 'player_' + Math.floor(Math.random() * 999999);
         let myName = "Viewer";
         let roomCode = "0";
         let isPlaying = false;
+        let isSitting = false;
         let otherPlayers = {}; 
-        let allPlayersData = {}; 
-        let myPlayerMesh = null; 
         
         // **GOD MODE CONFIG**
-        const GOD_NAME = "Praveen"; 
-        const GOD_COLOR = 0xffa500; 
+        const GOD_NAME = "Praveen"; // The name that gets the special character
+        const GOD_COLOR = 0xffa500; // Orange/Gold for divine glow
         const REGULAR_COLOR = 0x888888;
         
-        // **REAL-TIME SMOOTHNESS & INTERPOLATION CONFIG**
-        const POSITION_UPDATE_INTERVAL = 10; 
-        const INTERPOLATION_FACTOR = 0.4; 
+        // **SMOOTHNESS CONFIG**
+        const POSITION_UPDATE_INTERVAL = 50; // Faster update: 50ms (was 100ms)
+        const INTERPOLATION_FACTOR = 0.2;     // Quicker catch-up for smooth movement (was 0.1)
 
-        // Door State (Remains unchanged)
+        // Door State
         let isDoorOpen = false;
         let doorMesh; 
         const GAP_SIZE = 80; 
@@ -241,32 +170,23 @@
         // Collision constants
         const WALL_Z_POS = 0; 
         const PLAYER_RADIUS = 10; 
-        const DOOR_LEFT_X = -(GAP_SIZE / 2); 
-        const DOOR_RIGHT_X = (GAP_SIZE / 2); 
+        const DOOR_LEFT_X = -(GAP_SIZE / 2); // -40
+        const DOOR_RIGHT_X = (GAP_SIZE / 2); // 40
 
         const floorY = -50;
-        
-        // Minimap constants
-        const MINIMAP_SIZE = 150; 
-        const W = 800; 
-        const H = 800; 
-        const MAP_SCALE = MINIMAP_SIZE / W; 
 
-        // Window Control Variables (Remains unchanged)
+        // Window Control Variables
         let isWindowClosed = false;
         let windowGlassMesh;
-        const CLOSE_SPEED = 0.005; 
+        
+        const CLOSE_SPEED = 0.005; // Very slow close
+        
         const GLASS_START_X = -30; 
         const GLASS_CLOSED_X = 0; 
         let windowCloseBtn = document.getElementById('close-window-btn');
-        let exitBtn = document.getElementById('exit-btn');
-        const MAP_CANVAS = document.getElementById('minimap-canvas');
-        const MAP_CTX = MAP_CANVAS.getContext('2d');
-        const PLAYER_LIST_UL = document.getElementById('player-list');
-        const PLAYER_COUNT_H3 = document.getElementById('player-count');
-        const PLAYER_LIST_BOX = document.getElementById('player-list-box');
 
-        // 3. SCENE SETUP (Remains unchanged)
+
+        // 3. SCENE SETUP
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xf0f0f0);
         scene.fog = new THREE.Fog(0xf0f0f0, 10, 800); 
@@ -284,11 +204,11 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Lights (Remains unchanged)
+        // Lights
         const ambLight = new THREE.AmbientLight(0xffffff, 1.0); scene.add(ambLight);
         const pLight = new THREE.PointLight(0xffffff, 1.2, 800); pLight.position.set(0, 100, 0); scene.add(pLight); 
 
-        // 4. TEXTURES & MATERIALS (Remains unchanged)
+        // 4. TEXTURES & MATERIALS (Original materials remain)
         const wallMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.8, metalness: 0.0 });
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.6, metalness: 0.1 });
         const ceilingMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, metalness: 0.0 });
@@ -305,20 +225,22 @@
         
         const curtainMat = new THREE.MeshStandardMaterial({ color: 0xcac7b8, roughness: 0.8, side: THREE.DoubleSide }); 
 
-        // 5. VIDEO TEXTURE SETUP (Remains unchanged)
+        // 5. VIDEO TEXTURE SETUP (Original setup)
         const video = document.getElementById('skyVideo');
         video.volume = 0.0; 
 
         const videoTexture = new THREE.VideoTexture(video);
-        videoTexture.minFilter = THREE.NearestFilter;
-        videoTexture.magFilter = THREE.NearestFilter;
+        videoTexture.minFilter = THREE.LinearFilter;
+        videoTexture.magFilter = THREE.LinearFilter;
         videoTexture.format = THREE.RGBAFormat;
         videoTexture.wrapS = THREE.ClampToEdgeWrapping; 
         videoTexture.wrapT = THREE.ClampToEdgeWrapping; 
 
         const VIDEO_ASPECT = 16 / 9;
-        const W_H = 125; 
-        const W_W = 230; 
+        const W = 800; // Total Width
+        
+        const W_H = 125; // Window height 
+        const W_W = 230; // Window width (approx)
         
         const GEOMETRY_ASPECT = (W_W * 2) / (W_H * 2); 
         const V_REPEAT_FACTOR = GEOMETRY_ASPECT / VIDEO_ASPECT;
@@ -331,18 +253,22 @@
             fog: false
         });
         
-        // 6. BUILD ROOM (Remains unchanged)
+        // 6. BUILD ROOM (Original room building functions remain)
         const galleryObjects = []; 
         
-        const T=200; 
+        const H=800; // Total Depth
+        const T=200; // Room/Wall Height
         const maxPos = W/2 - 10; 
 
         const CEILING_Y = floorY + T; 
         const WALL_CENTER_Y = floorY + T/2; 
         
+        // --- WINDOW CONFIG ---
         const W_D = 30; 
-        const BACK_Z = -400; 
+        const BACK_Z = -400; // Z-position of the back wall
 
+
+        // --- CUSTOM WALL BUILDER FOR BAY WINDOW CUTOUT ---
         function buildWallWithCutout(w, h, pz) {
             const windowStart = -W_W/2; 
             const windowEnd = W_W/2; 
@@ -354,24 +280,28 @@
             const wallGroup = new THREE.Group();
             wallGroup.position.set(0, WALL_CENTER_Y, pz);
 
+            // Left wall segment
             const leftW = w/2 + windowStart;
             const leftH = h;
             const leftMesh = new THREE.Mesh(new THREE.PlaneGeometry(leftW, leftH), wallMat);
             leftMesh.position.x = windowStart - leftW/2;
             wallGroup.add(leftMesh); galleryObjects.push(leftMesh);
 
+            // Right wall segment
             const rightW = w/2 - windowEnd;
             const rightH = h;
             const rightMesh = new THREE.Mesh(new THREE.PlaneGeometry(rightW, rightH), wallMat);
             rightMesh.position.x = windowEnd + rightW/2;
             wallGroup.add(rightMesh); galleryObjects.push(rightMesh);
 
+            // Top beam
             const topH = h - (windowTop - windowBottom);
             const topYOffset = windowTop + (topH / 2) - WALL_CENTER_Y;
             const topMesh = new THREE.Mesh(new THREE.PlaneGeometry(windowEnd - windowStart, topH), wallMat);
             topMesh.position.y = topYOffset;
             wallGroup.add(topMesh); galleryObjects.push(topMesh);
 
+            // Bottom support (Wall below the cutout)
             const bottomH = windowBottom - floorY;
             const bottomYOffset = windowBottom - bottomH/2 - WALL_CENTER_Y;
             const bottomMesh = new THREE.Mesh(new THREE.PlaneGeometry(windowEnd - windowStart, bottomH), wallMat);
@@ -381,22 +311,28 @@
             scene.add(wallGroup);
         }
 
+
+        // --- Standard Wall Builder ---
         function buildWallGroup(w, h, px, py, pz, rx, ry, material) {
             const g = new THREE.Group();
             g.position.set(px, py, pz);
             g.rotation.set(rx, ry, 0);
             
+            // Simple Plane for optimization, since panels don't use UVs
             const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
             g.add(m); 
             galleryObjects.push(m);
             scene.add(g);
         }
 
+        // --- GALLERY BUILD ---
         const HALF_W = W/2;
         const HALF_H = H/2;
         
+        // Floor (Y=-50)
         buildWallGroup(W,H, 0,-50,0, -Math.PI/2,0, floorMat); 
         
+        // CEILING 
         function createCeiling() {
             const geometry = new THREE.PlaneGeometry(W, H, 10, 10); 
             const mesh = new THREE.Mesh(geometry, ceilingMat); 
@@ -406,12 +342,23 @@
         }
         createCeiling();
         
+        // Walls
+        // Back Wall with Window Cutout
         buildWallWithCutout(W,T, BACK_Z);
+        
+        // Bay Window/Screen Elements
         createBayWindowScene(); 
+        
+        // Front Wall: Z = 400
         buildWallGroup(W,T, 0,WALL_CENTER_Y,HALF_H, 0,Math.PI, wallMat);
+        
+        // Left Wall: X = -400
         buildWallGroup(H,T, -HALF_W,WALL_CENTER_Y,0, 0,Math.PI/2, wallMat);
+        
+        // Right Wall: X = 400
         buildWallGroup(H,T, HALF_W,WALL_CENTER_Y,0, 0,-Math.PI/2, wallMat);
 
+        // --- CENTRAL DIVIDING WALL (Door) ---
         const wallHeight = T; 
         const wallSegmentWidth = HALF_W - GAP_SIZE/2; 
         const wallSegmentCenter = HALF_W/2 + GAP_SIZE/4; 
@@ -445,12 +392,14 @@
         doorMesh.position.set(DOOR_CLOSED_POS, floorY + DOOR_HEIGHT/2, 0); 
         scene.add(doorMesh);
         
-        // 7. FURNITURE (Remains unchanged)
+        // 7. FURNITURE (Original furniture remains)
         function createFurniture() {
             const g = new THREE.Group();
             
+            // Pedestals 
             const pMat = new THREE.MeshStandardMaterial({color: 0x999999});
             
+            // Pedestal 1
             const leg1 = new THREE.Mesh(new THREE.CylinderGeometry(3,3,30,16), pMat);
             leg1.position.set(0, floorY + 15, -200); g.add(leg1); galleryObjects.push(leg1);
             const top1 = new THREE.Mesh(new THREE.CylinderGeometry(35,35,2,32), pMat);
@@ -458,6 +407,7 @@
             const sculpture1 = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshStandardMaterial({color: 0xaa00aa, roughness: 0.1, metalness: 0.8}));
             sculpture1.position.set(0, floorY + 35, -200); g.add(sculpture1); galleryObjects.push(sculpture1);
 
+            // Pedestal 2
             const leg2 = new THREE.Mesh(new THREE.CylinderGeometry(3,3,30,16), pMat);
             leg2.position.set(0, floorY + 15, 200); g.add(leg2); galleryObjects.push(leg2);
             const top2 = new THREE.Mesh(new THREE.CylinderGeometry(35,35,2,32), pMat);
@@ -469,48 +419,59 @@
         }
         createFurniture(); 
         
+        // --- BAY WINDOW SCENE (Original bay window setup remains) ---
         function createBayWindowScene() {
             const group = new THREE.Group();
             
             const VIEW_W = W_W * 1.5; 
             const VIEW_H = W_H * 1.5;
 
+            // 1. EXTERNAL VIEW PLANE (The Video Screen)
             const viewPlaneGeo = new THREE.PlaneGeometry(VIEW_W, VIEW_H);
             const viewPlane = new THREE.Mesh(viewPlaneGeo, unlitVideoMat);
-            viewPlane.position.set(0, WALL_CENTER_Y, BACK_Z - 5); 
+            viewPlane.position.set(0, WALL_CENTER_Y, BACK_Z - 5); // Z = -405
             group.add(viewPlane);
             
+            // 2. RECESS FRAME AND SILL
             const frameThickness = 5;
             const W_D_HALF = W_D / 2;
             const recessMat = wallMatInterior.clone();
             recessMat.color.set(0xdddddd); 
 
+            // Recess Top
             const recessTop = new THREE.Mesh(new THREE.BoxGeometry(W_W, frameThickness, W_D), recessMat);
             recessTop.position.set(0, WALL_CENTER_Y + W_H/2 + frameThickness/2, BACK_Z - W_D_HALF);
             group.add(recessTop);
 
+            // Recess Bottom/Sill 
             const sillDepth = W_D + 15;
             const sillMat = new THREE.MeshStandardMaterial({ color: 0xb5b5b5, roughness: 0.4 });
             const sill = new THREE.Mesh(new THREE.BoxGeometry(W_W + 10, 5, sillDepth), sillMat);
             sill.position.set(0, WALL_CENTER_Y - W_H/2 - 2, BACK_Z + sillDepth/2 - W_D);
             group.add(sill);
             
+            // 3. CURTAINS 
             const curtainWidth = W_W * 0.4;
             const curtainHeight = T;
             
+            // Left Curtain
             const cL = new THREE.Mesh(new THREE.PlaneGeometry(curtainWidth, curtainHeight), curtainMat);
             cL.position.set(-W_W/2 - curtainWidth/2 - 10, WALL_CENTER_Y, BACK_Z + 1); 
             group.add(cL);
             
+            // Right Curtain
             const cR = new THREE.Mesh(new THREE.PlaneGeometry(curtainWidth, curtainHeight), curtainMat);
             cR.position.set(W_W/2 + curtainWidth/2 + 10, WALL_CENTER_Y, BACK_Z + 1);
             group.add(cR);
             
+            // 4. INVISIBLE GLASS PLANE (For collision/blocking rays if needed)
             const invisibleGlassGeo = new THREE.PlaneGeometry(W_W, W_H);
             const invisibleGlass = new THREE.Mesh(invisibleGlassGeo, transparentGlassMat);
             invisibleGlass.position.set(0, WALL_CENTER_Y, BACK_Z - 1); 
             group.add(invisibleGlass);
             
+
+            // 5. ADVANCED SLIDING GLASS PANEL (Visual representation of the sound control)
             const glassPanelWidth = W_W + 5; 
             const glassPanelHeight = W_H + 5; 
             const glassThickness = 5;
@@ -520,6 +481,7 @@
                 closedWindowGlassMat
             );
             
+            // Start position: Off to the side (open)
             windowGlassMesh.position.set(
                 GLASS_START_X - glassPanelWidth, 
                 WALL_CENTER_Y, 
@@ -533,22 +495,23 @@
         }
 
 
-        // 8. PLAYER CREATION FUNCTIONS (Remains unchanged)
-        
+        // **GOD MODE PLAYER CREATION FUNCTION**
         function createGodPlayer(name) {
             const playerGroup = new THREE.Group();
             
+            // 1. God Body (Glowing)
             const godMat = new THREE.MeshStandardMaterial({
                 color: GOD_COLOR, 
                 emissive: GOD_COLOR, 
-                emissiveIntensity: 0.5, 
+                emissiveIntensity: 0.5, // Subtle glow
                 roughness: 0.1, 
                 metalness: 0.9 
             });
-            const body = new THREE.Mesh(new THREE.CapsuleGeometry(7, 25, 4, 8), godMat); 
+            const body = new THREE.Mesh(new THREE.CapsuleGeometry(7, 25, 4, 8), godMat); // Slightly larger body
             body.position.y = 0;
             playerGroup.add(body);
 
+            // 2. God Particle Aura (Points)
             const particleCount = 200;
             const particleGeo = new THREE.BufferGeometry();
             const positions = [];
@@ -556,10 +519,17 @@
             const color = new THREE.Color(GOD_COLOR);
             
             for (let i = 0; i < particleCount; i++) {
+                // Random position within a sphere around the player
                 const radius = 15 + Math.random() * 5;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos(Math.random() * 2 - 1);
-                positions.push(radius * Math.sin(phi) * Math.cos(theta), radius * Math.sin(phi) * Math.sin(theta) + 10, radius * Math.cos(phi));
+                
+                positions.push(
+                    radius * Math.sin(phi) * Math.cos(theta), // X
+                    radius * Math.sin(phi) * Math.sin(theta) + 10, // Y offset up
+                    radius * Math.cos(phi) // Z
+                );
+                
                 colors.push(color.r, color.g, color.b);
             }
 
@@ -578,56 +548,31 @@
             const aura = new THREE.Points(particleGeo, particleMat);
             playerGroup.add(aura);
             
+            // 3. God Name Tag
             const canvas = document.createElement('canvas'); 
             canvas.width=300; canvas.height=80;
             const ctx = canvas.getContext('2d'); 
             ctx.font="bold 40px Arial"; 
-            ctx.fillStyle="#FFD700"; 
+            ctx.fillStyle="#FFD700"; // Gold color for the name
             ctx.strokeStyle="#000000";
             ctx.lineWidth=3;
             ctx.textAlign="center"; 
-            ctx.strokeText(`✨ ${name} ✨`, 150, 50); 
+            ctx.strokeText(`✨ ${name} ✨`, 150, 50); // Add flair
             ctx.fillText(`✨ ${name} ✨`, 150, 50);
 
             const spriteMat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas) });
             const nameTag = new THREE.Sprite(spriteMat);
-            nameTag.position.y = 35; 
+            nameTag.position.y = 35; // Higher position
             nameTag.scale.set(30, 8, 1); 
             playerGroup.add(nameTag);
             
+            // Attach the aura mesh to the group so we can animate it later
             playerGroup.userData.auraMesh = aura;
 
             return playerGroup;
         }
 
-        function createStandardPlayer(p) {
-            const g = new THREE.Group();
-            
-            const b = new THREE.Mesh(new THREE.CapsuleGeometry(6,20,4,8), new THREE.MeshStandardMaterial({color:REGULAR_COLOR}));
-            g.add(b);
-            
-            const c=document.createElement('canvas'); c.width=256; c.height=64;
-            const ctx=c.getContext('2d'); ctx.font="bold 30px Arial"; ctx.fillStyle="#333"; ctx.textAlign="center"; ctx.fillText(p.name,128,40);
-            const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c)}));
-            s.position.y=25; 
-            s.scale.set(20,5,1); 
-            g.add(s);
-            
-            return g;
-        }
-
-        // 9. GAME LOGIC
-        // ** CRITICAL CHECK: If exit flag is set, prevent re-entry **
-        if (sessionStorage.getItem('isExiting') === 'true') {
-            log("Session exit flag detected. Clearing flag and staying on login screen.");
-            sessionStorage.removeItem('isExiting');
-            // Do not execute any further game setup until 'join-btn' is clicked again.
-        } else {
-             // Continue standard setup flow
-             document.getElementById('login-screen').style.display='flex';
-        }
-
-
+        // 8. LOGIC 
         document.getElementById('join-btn').addEventListener('click', () => {
             const u = document.getElementById('username').value.trim();
             const r = document.getElementById('room-code').value.trim();
@@ -635,105 +580,87 @@
                  log("ERROR: Enter Name & Code");
                  return;
             }
+            // Capitalize the name entered to ensure it matches the GOD_NAME check consistently
             myName = u.charAt(0).toUpperCase() + u.slice(1); 
             roomCode = "room_" + r;
             document.getElementById('login-screen').style.display='none';
             document.getElementById('room-display').innerText=`GALLERY: ${r} ${myName === GOD_NAME ? '(GOD MODE)' : ''}`;
-            exitBtn.style.display = 'block'; 
-            PLAYER_LIST_BOX.style.display = 'block'; 
-            MAP_CANVAS.style.display = 'block'; 
             isPlaying=true;
             
-            video.play().catch(e => log("ERROR: Video playback failed: " + e.message));
+            // CRITICAL FIX: Unmute video and initiate playback after user interaction
+            video.muted = false;
+            video.play().catch(e => log("ERROR: Video playback failed. Check video path (sky.mp4) and ensure it's on a live server: " + e.message));
 
-            const isMyPlayerGod = myName === GOD_NAME;
-            if (isMyPlayerGod) {
-                myPlayerMesh = createGodPlayer(myName);
-            } else {
-                myPlayerMesh = createStandardPlayer({ name: myName }); 
-            }
+            setTimeout(() => {
+                videoTexture.needsUpdate = true;
+            }, 50);
 
             initMultiplayer();
         });
 
-        // ** CRITICAL FIX: The robust exit function **
-        async function exitGallery() {
-            log("Exiting gallery and setting session flag...");
+        function createStandardPlayer(p) {
+            // Reusable function for standard player creation
+            const g = new THREE.Group();
             
-            // 1. Set the flag: This tells the page on reload not to auto-rejoin.
-            sessionStorage.setItem('isExiting', 'true');
-
-            if (roomCode !== "0" && myId) {
-                // 2. Delete player data from Firebase
-                await deleteDoc(doc(db, "rooms", roomCode, "players", myId)).catch((e)=>{
-                     log(`Cleanup failed, data deletion may be slightly delayed: ${e.message}`);
-                });
-            }
-            // 3. Force reload: The flag ensures the reload lands on the login screen.
-            window.location.reload(); 
+            // Player body (Capsule)
+            const b = new THREE.Mesh(new THREE.CapsuleGeometry(6,20,4,8), new THREE.MeshStandardMaterial({color:REGULAR_COLOR}));
+            g.add(b);
+            
+            // Player name tag (Sprite)
+            const c=document.createElement('canvas'); c.width=256; c.height=64;
+            const ctx=c.getContext('2d'); ctx.font="bold 30px Arial"; ctx.fillStyle="#333"; ctx.textAlign="center"; ctx.fillText(p.name,128,40);
+            const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c)}));
+            s.position.y=25; // Positioned above the body mesh
+            s.scale.set(20,5,1); 
+            g.add(s);
+            
+            return g;
         }
 
 
-        async function initMultiplayer() {
+        function initMultiplayer() {
             const roomRef = doc(db, "rooms", roomCode);
             const playersRef = collection(db, "rooms", roomCode, "players");
 
-            try {
-                const roomSnap = await getDoc(roomRef);
-                if (!roomSnap.exists()) {
-                    await setDoc(roomRef, { doorOpen: false });
-                    isDoorOpen = false;
-                    document.getElementById('door-btn').innerText = "🚪 OPEN DOOR";
-                    log("Room document created successfully.");
-                } else {
-                     log("Room document exists.");
-                }
-            } catch (e) {
-                log("FATAL ERROR: Could not create/check room document. Check Firestore Rules: " + e.message);
-                return; 
-            }
-            
             // Room state listener (for door)
             onSnapshot(roomRef, (snap) => {
+                if(!snap.exists()) { 
+                    // CRITICAL FIX: Ensure initial doc is created only if it doesn't exist
+                    setDoc(roomRef, {doorOpen:false}).catch(()=>{ log("ERROR: Failed to set initial room state."); }); 
+                    return; 
+                }
                 const d = snap.data();
+                
                 if(d && d.doorOpen !== undefined && d.doorOpen !== isDoorOpen) {
                     isDoorOpen = d.doorOpen;
                     document.getElementById('door-btn').innerText = isDoorOpen ? "🚪 CLOSE DOOR" : "🚪 OPEN DOOR";
-                    log(`Door state updated by network to ${isDoorOpen}`);
                 }
-            }, (error) => {
-                log("Room listener error: " + error.message);
             });
 
-            // Players listener - NOW UPDATES player list and allPlayersData
+            // Players listener
             onSnapshot(playersRef, (snap) => {
                 const now = Date.now();
                 const activePlayerIds = new Set();
-                const newAllPlayersData = {}; 
-                const playerListItems = [];
 
                 snap.forEach(d => {
                     const id = d.id;
                     const p = d.data();
                     
-                    // Simple disconnect check (10s timeout)
-                    if(now - p.time > 10000) return; 
-                    
+                    if(now - p.time > 10000) return; // Ignore stale data (10 seconds)
+                    if(id === myId) return;
+
                     activePlayerIds.add(id);
-                    newAllPlayersData[id] = p; // Store ALL data for minimap
-                    const isGodPlayer = p.name === GOD_NAME;
-                    
-                    // Add to player list
-                    const status = (id === myId) ? "(You)" : "";
-                    const godTag = isGodPlayer ? " ✨" : "";
-                    playerListItems.push(`<li>${p.name}${godTag} ${status}</li>`);
-
-
-                    // Logic for OTHER players
-                    if(id === myId) return; 
 
                     if(!otherPlayers[id]) {
-                        const newPlayerMesh = isGodPlayer ? createGodPlayer(p.name) : createStandardPlayer(p);
+                        // --- PLAYER CREATION LOGIC MODIFIED ---
+                        let newPlayerMesh;
+                        const isGodPlayer = p.name === GOD_NAME;
+
+                        if(isGodPlayer) {
+                            newPlayerMesh = createGodPlayer(p.name);
+                        } else {
+                            newPlayerMesh = createStandardPlayer(p);
+                        }
                         
                         scene.add(newPlayerMesh);
                         otherPlayers[id] = { 
@@ -742,70 +669,55 @@
                             tRot: p.ry, 
                             isGod: isGodPlayer
                         };
-                        newPlayerMesh.position.set(p.x,p.y,p.z); 
-                        log(`Player ${p.name} joined.`);
+                        newPlayerMesh.position.set(p.x,p.y,p.z);
                     } else {
+                        // Update existing player target position
                         otherPlayers[id].tPos.set(p.x,p.y,p.z);
                         otherPlayers[id].tRot = p.ry;
                     }
                 });
                 
-                // Update player list HTML and counter
-                PLAYER_LIST_UL.innerHTML = playerListItems.join('');
-                PLAYER_COUNT_H3.innerText = `Viewers (${activePlayerIds.size})`;
-                allPlayersData = newAllPlayersData; 
-
                 // Cleanup disconnected players
                 Object.keys(otherPlayers).forEach(id => {
                     if(!activePlayerIds.has(id)) { 
                         scene.remove(otherPlayers[id].mesh); 
                         delete otherPlayers[id]; 
-                        log(`Player ${id} disconnected.`);
                     }
                 });
-            }, (error) => {
-                log("Players listener error: " + error.message);
             });
 
-            // Position broadcast loop: **CRITICAL: High-frequency update**
+            // Position broadcast loop: **NOW FASTER (50ms)**
             setInterval(() => {
                 if(isPlaying) {
                     setDoc(doc(playersRef, myId), {
                         x:camera.position.x, 
-                        y:camera.position.y-10, 
+                        y:camera.position.y-10, // Adjust Y to be ground-level for the capsule
                         z:camera.position.z,
                         ry:camera.rotation.y, 
                         name:myName, 
                         time:Date.now()
                     }, { merge: true }).catch((e)=>{ 
-                         console.warn("Update failed. Check Firestore Rules for /players/{playerId}:", e.message);
+                         // Log a warning, but don't stop the whole debug console just for one failure
+                         console.warn("Update failed, retrying soon.", e.message);
                     });
                 }
-            }, POSITION_UPDATE_INTERVAL); 
+            }, POSITION_UPDATE_INTERVAL); // Uses the 50ms constant
         }
         
-        // --- INTERACTION LOGIC (Remains unchanged)---
+        // --- DOOR INTERACTION (Original logic remains) ---
         const doorBtn = document.getElementById('door-btn');
         doorBtn.addEventListener('click', () => {
             const newState = !isDoorOpen;
-            updateDoc(doc(db, "rooms", roomCode), {doorOpen: newState})
-                .then(() => {
-                    log(`Door state updated to ${newState}`);
-                })
-                .catch((error) => { 
-                    log("ERROR: Failed to update door state. Access Denied. Check Firestore Rules for /rooms/{roomId} 'update' permission."); 
-                });
+            updateDoc(doc(db, "rooms", roomCode), {doorOpen: newState}).catch(()=>{ log("ERROR: Failed to update door state."); });
         });
 
+        // --- WINDOW INTERACTION (Original logic remains) ---
         windowCloseBtn.addEventListener('click', () => {
             isWindowClosed = !isWindowClosed;
             windowCloseBtn.innerText = isWindowClosed ? "🪟 OPEN WINDOW" : "🪟 CLOSE WINDOW";
         });
         
-        // Exit button event listener
-        exitBtn.addEventListener('click', exitGallery);
-
-        // --- JOYSTICK CONTROLS (Remains unchanged)---
+        // --- JOYSTICK CONTROLS (Original logic remains) ---
         let joyId=null, lookId=null;
         let move={x:0,y:0}, lastLook={x:0,y:0};
         
@@ -874,11 +786,10 @@
                     const t = e.changedTouches[i];
                     const dx = t.clientX - lastLook.x;
                     const dy = t.clientY - lastLook.y;
-                    
+                    // Invert look sensitivity on touch (dy for camera.rotation.x is often inverted)
                     camera.rotation.y -= dx * 0.004; 
                     camera.rotation.x -= dy * 0.004; 
-                    
-                    camera.rotation.x = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, camera.rotation.x)); 
+                    camera.rotation.x = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, camera.rotation.x)); // Clamp vertical look
                     lastLook = {x: t.clientX, y: t.clientY};
                 }
             }
@@ -890,71 +801,6 @@
             }
         });
 
-        // 10. MINIMAP DRAWING FUNCTION (Remains unchanged)
-        function drawMinimap() {
-            if (!isPlaying) return;
-
-            MAP_CTX.clearRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
-            MAP_CTX.fillStyle = 'rgba(200, 200, 200, 0.5)';
-            MAP_CTX.fillRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
-            
-            MAP_CTX.strokeStyle = '#333333';
-            MAP_CTX.lineWidth = 2;
-            MAP_CTX.strokeRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
-
-            const mapZCenter = H/2 * MAP_SCALE; 
-            const doorLeftMap = (W/2 + DOOR_LEFT_X) * MAP_SCALE;
-            const doorRightMap = (W/2 + DOOR_RIGHT_X) * MAP_SCALE;
-
-            MAP_CTX.beginPath();
-            MAP_CTX.moveTo(0, mapZCenter);
-            MAP_CTX.lineTo(doorLeftMap, mapZCenter);
-            
-            if(isDoorOpen) {
-                MAP_CTX.strokeStyle = '#AA0000';
-                MAP_CTX.lineTo(doorRightMap, mapZCenter);
-                MAP_CTX.strokeStyle = '#333333';
-            } else {
-                MAP_CTX.moveTo(doorLeftMap, mapZCenter);
-                MAP_CTX.strokeStyle = '#888888';
-                MAP_CTX.lineTo(doorRightMap, mapZCenter);
-                MAP_CTX.strokeStyle = '#333333';
-            }
-            MAP_CTX.moveTo(doorRightMap, mapZCenter);
-            MAP_CTX.lineTo(MINIMAP_SIZE, mapZCenter);
-            MAP_CTX.stroke();
-
-            for (const id in allPlayersData) {
-                const p = allPlayersData[id];
-                const mapX = (p.x + W/2) * MAP_SCALE; 
-                const mapY = (p.z + H/2) * MAP_SCALE; 
-
-                MAP_CTX.beginPath();
-                MAP_CTX.arc(mapX, mapY, 4, 0, Math.PI * 2);
-
-                if (id === myId) {
-                    MAP_CTX.fillStyle = '#00CC00'; 
-                    MAP_CTX.fill();
-                    const rot = p.ry;
-                    const size = 7;
-                    MAP_CTX.fillStyle = '#008800'; 
-                    MAP_CTX.save();
-                    MAP_CTX.translate(mapX, mapY);
-                    MAP_CTX.rotate(rot); 
-                    MAP_CTX.moveTo(0, -size); 
-                    MAP_CTX.lineTo(-size * 0.5, size * 0.5); 
-                    MAP_CTX.lineTo(size * 0.5, size * 0.5); 
-                    MAP_CTX.closePath();
-                    MAP_CTX.fill();
-                    MAP_CTX.restore();
-
-                } else {
-                    MAP_CTX.fillStyle = p.name === GOD_NAME ? GOD_COLOR : '#CC0000';
-                    MAP_CTX.fill();
-                }
-            }
-        }
-
 
         // --- ANIMATION ---
         camera.position.set(0,0,100);
@@ -962,54 +808,82 @@
         function animate() {
             requestAnimationFrame(animate);
 
+            // 1. VIDEO TEXTURE UPDATE & PLAYBACK CHECK (Original logic remains)
             if (isPlaying) {
                 if (video.readyState >= video.HAVE_CURRENT_DATA) {
                     videoTexture.needsUpdate = true;
                 }
+                // Check if video paused unexpectedly and attempt to restart
+                if (video.paused && !video.muted) {
+                    video.play().catch(e => {
+                        log("Warning: Video attempted restart but failed.");
+                    });
+                }
             }
 
+
+            // 2. DOOR ANIMATION (Original logic remains)
             const targetXDoor = isDoorOpen ? DOOR_OPEN_POS : DOOR_CLOSED_POS; 
             doorMesh.position.x += (targetXDoor - doorMesh.position.x) * DOOR_SPEED;
 
+            // 3. ADVANCED WINDOW CLOSING/OPENING (Original logic remains)
             const targetXGlass = isWindowClosed ? GLASS_CLOSED_X : (GLASS_START_X - windowGlassMesh.geometry.parameters.width); 
             const currentXGlass = windowGlassMesh.position.x;
             windowGlassMesh.position.x += (targetXGlass - currentXGlass) * CLOSE_SPEED;
             
+            // Calculate closure ratio (0.0=Open, 1.0=Closed)
             const range = GLASS_CLOSED_X - (GLASS_START_X - windowGlassMesh.geometry.parameters.width);
             const relativePosition = windowGlassMesh.position.x - (GLASS_START_X - windowGlassMesh.geometry.parameters.width);
             let closureRatio = relativePosition / range;
             closureRatio = Math.max(0, Math.min(1, closureRatio));
 
+
+            // 4. VIDEO SOUND CONTROL (Window Damping and Distance Falloff - Original logic remains)
+            
+            // A. WINDOW CLOSURE LOGIC
             const windowVolumeFactor = 1.0 - closureRatio;
-            const SCREEN_Z_POS = BACK_Z; 
+
+            // B. DISTANCE ATTENUATION LOGIC
+            const SCREEN_Z_POS = BACK_Z; // -400 (The wall position)
             const MAX_HEARING_DISTANCE = 600; 
             const MIN_DISTANCE_VOLUME_ONE = 20; 
+
+            // Calculate the absolute distance from the screen wall
             const distance = Math.abs(camera.position.z - SCREEN_Z_POS);
 
             let distanceVolumeFactor;
+
             if (distance <= MIN_DISTANCE_VOLUME_ONE) {
                 distanceVolumeFactor = 1.0; 
             } else if (distance >= MAX_HEARING_DISTANCE) {
                 distanceVolumeFactor = 0.0;
             } else {
+                // Smoothly map the volume drop over the fading range
                 distanceVolumeFactor = 1.0 - (distance - MIN_DISTANCE_VOLUME_ONE) / (MAX_HEARING_DISTANCE - MIN_DISTANCE_VOLUME_ONE);
             }
+
+            // Combine the two factors: Window Damping * Distance Falloff
             video.volume = windowVolumeFactor * distanceVolumeFactor;
 
-            if(move.x!==0 || move.y!==0) {
+
+            // 5. MOVEMENT & COLLISION (Original logic remains)
+            if(!isSitting && (move.x!==0 || move.y!==0)) {
                 const oldX = camera.position.x;
                 const oldZ = camera.position.z;
 
                 const fwd = new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0), camera.rotation.y);
                 const rgt = new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0), camera.rotation.y);
                 
+                // Reduce movement speed slightly for better control
                 const speed = 3.0; 
                 camera.position.addScaledVector(fwd, -move.y * speed);
                 camera.position.addScaledVector(rgt, move.x * speed);
                 
+                // Outer wall bounds 
                 camera.position.x = Math.max(-maxPos, Math.min(maxPos, camera.position.x));
                 camera.position.z = Math.max(-(HALF_H - PLAYER_RADIUS), Math.min(HALF_H - PLAYER_RADIUS, camera.position.z));
                 
+                // Central wall collision check (Z=0 wall)
                 const playerZ = camera.position.z;
                 const playerX = camera.position.x;
                 
@@ -1025,37 +899,42 @@
                 }
             }
 
+            // 6. BUTTON VISIBILITY (Door and Window - Original logic remains)
             const isNearDoor = camera.position.z > -150 && camera.position.z < 150 && camera.position.x > -100 && camera.position.x < 100 && isPlaying;
             const isNearWindow = camera.position.z < (BACK_Z + 100) && camera.position.x > -150 && camera.position.x < 150 && isPlaying;
+
             doorBtn.style.display = isNearDoor ? "block" : "none";
             windowCloseBtn.style.display = isNearWindow ? "block" : "none";
 
-
+            // 7. MULTIPLAYER ANIMATION
             const time = Date.now() * 0.001;
             for(let id in otherPlayers) {
                 const p = otherPlayers[id];
+                // **SMOOTHER INTERPOLATION HERE (0.2)**
                 p.mesh.position.lerp(p.tPos, INTERPOLATION_FACTOR); 
                 p.mesh.rotation.y += (p.tRot - p.mesh.rotation.y)*INTERPOLATION_FACTOR;
                 
+                // GOD MODE AURA ANIMATION
                 if (p.isGod) {
                     const aura = p.mesh.userData.auraMesh;
                     if (aura) {
+                        // Slowly rotate the aura
                         aura.rotation.y = time * 0.5; 
+                        // Gently move particles up and down
                         aura.position.y = Math.sin(time * 3) * 1.5;
                     }
                 }
             }
 
-            drawMinimap();
+            document.getElementById('timer').style.display='none';
 
             renderer.render(scene, camera);
         }
         animate();
 
         // Cleanup on window close
-        window.addEventListener('beforeunload', (e) => {
-            if (roomCode !== "0" && myId && isPlaying) {
-                // Do NOT use await here, as the browser will terminate immediately.
+        window.addEventListener('beforeunload', () => {
+            if (roomCode !== "0" && myId) {
                 deleteDoc(doc(db, "rooms", roomCode, "players", myId)).catch(()=>{});
             }
         });
