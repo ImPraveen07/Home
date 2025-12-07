@@ -75,8 +75,7 @@
     </style>
 </head>
 <body>
-
-    <video id="skyVideo" loop playsinline muted style="display:none" preload="auto">
+    <video id="skyVideo" loop playsinline style="display:none" preload="auto">
         <source src="sky.mp4" type="video/mp4">
         Your browser does not support the video tag.
     </video>
@@ -142,12 +141,12 @@
         } catch(e) { log("CONFIG ERROR: Firebase initialization failed: " + e.message); }
 
         // 2. VARIABLES
-        // 👇 FIX: Reverted to random ID, as no authentication is required for entry.
         const myId = 'player_' + Math.floor(Math.random() * 999999); 
         let myName = "Viewer";
         let roomCode = "0";
         let isPlaying = false;
         let otherPlayers = {}; 
+        let myPlayerMesh = null; // FIX: Variable to hold the local player's mesh
         
         // **GOD MODE CONFIG**
         const GOD_NAME = "Praveen"; // The name that gets the special character
@@ -156,7 +155,7 @@
         
         // **SMOOTHNESS CONFIG**
         const POSITION_UPDATE_INTERVAL = 50; // Faster update: 50ms
-        const INTERPOLATION_FACTOR = 0.25;    // Quicker catch-up for smooth movement (Increased for responsiveness)
+        const INTERPOLATION_FACTOR = 0.25;    // Quicker catch-up for smooth movement
 
         // Door State
         let isDoorOpen = false;
@@ -229,8 +228,9 @@
         video.volume = 0.0; 
 
         const videoTexture = new THREE.VideoTexture(video);
-        videoTexture.minFilter = THREE.LinearFilter;
-        videoTexture.magFilter = THREE.LinearFilter;
+        // ** FIX 2: Optimized Texture Filtering for performance/lag **
+        videoTexture.minFilter = THREE.NearestFilter;
+        videoTexture.magFilter = THREE.NearestFilter;
         videoTexture.format = THREE.RGBAFormat;
         videoTexture.wrapS = THREE.ClampToEdgeWrapping; 
         videoTexture.wrapT = THREE.ClampToEdgeWrapping; 
@@ -556,7 +556,7 @@
             // Reusable function for standard player creation (non-God)
             const g = new THREE.Group();
             
-            // Player body (Capsule - same shape as God, just different material)
+            // ** FIX 3: Standard Player body (Capsule - same shape as God, just different material) **
             const b = new THREE.Mesh(new THREE.CapsuleGeometry(6,20,4,8), new THREE.MeshStandardMaterial({color:REGULAR_COLOR}));
             g.add(b);
             
@@ -586,13 +586,19 @@
             document.getElementById('room-display').innerText=`GALLERY: ${r} ${myName === GOD_NAME ? '(GOD MODE)' : ''}`;
             isPlaying=true;
             
-            // ** FIX 1: Set video to muted for guaranteed autoplay success on user interaction **
-            video.muted = true; 
-            
-            // Start playback
+            // ** FIX 1: Removed `video.muted = true;` to enable immediate sound, relying on the click event **
+            // Start playback - The click handles the autoplay policy, and volume is controlled by distance/window.
             video.play().catch(e => log("ERROR: Video playback failed. Check video path (sky.mp4) and ensure it's on a live server: " + e.message));
 
-            // 👇 FIX: Start multiplayer directly without authentication
+            // *** FIX 3 PART 1: Create the local player mesh but DO NOT add to scene ***
+            const isMyPlayerGod = myName === GOD_NAME;
+            if (isMyPlayerGod) {
+                myPlayerMesh = createGodPlayer(myName);
+            } else {
+                myPlayerMesh = createStandardPlayer({ name: myName }); 
+            }
+            // scene.add(myPlayerMesh); // EXCLUDED so the local user doesn't see their own avatar.
+
             initMultiplayer();
         });
 
@@ -601,8 +607,6 @@
             const roomRef = doc(db, "rooms", roomCode);
             const playersRef = collection(db, "rooms", roomCode, "players");
 
-            // *** FIX 1: Ensure room document exists before setting up listeners ***
-            // This relies on the security rule allowing 'create' for 'if true'.
             try {
                 const roomSnap = await getDoc(roomRef);
                 if (!roomSnap.exists()) {
@@ -612,8 +616,7 @@
                      log("Room document exists.");
                 }
             } catch (e) {
-                // If this fails, the rule is blocking the *unauthenticated* user.
-                log("FATAL ERROR: Could not create/check room document. Check Firestore Rules for /rooms/{roomId}: " + e.message);
+                log("FATAL ERROR: Could not create/check room document. Check Firestore Rules: " + e.message);
                 return; 
             }
             
@@ -644,7 +647,7 @@
                     const isGodPlayer = p.name === GOD_NAME;
 
                     if(!otherPlayers[id]) {
-                        // Player is new
+                        // ** FIX 3: Ensures other players are created correctly (God or Standard) **
                         const newPlayerMesh = isGodPlayer ? createGodPlayer(p.name) : createStandardPlayer(p);
                         
                         scene.add(newPlayerMesh);
@@ -676,7 +679,6 @@
             // Position broadcast loop: **50ms interval for responsiveness**
             setInterval(() => {
                 if(isPlaying) {
-                    // This relies on the security rule allowing 'create'/'update' for 'if true' in the /players subcollection.
                     setDoc(doc(playersRef, myId), {
                         x:camera.position.x, 
                         y:camera.position.y-10, 
@@ -695,7 +697,6 @@
         const doorBtn = document.getElementById('door-btn');
         doorBtn.addEventListener('click', () => {
             const newState = !isDoorOpen;
-            // NOTE: This update will FAIL if Firestore rules require authentication.
             updateDoc(doc(db, "rooms", roomCode), {doorOpen: newState})
                 .then(() => {
                     log(`Door state updated to ${newState}`);
@@ -801,7 +802,7 @@
             requestAnimationFrame(animate);
 
             if (isPlaying) {
-                // ** FIX 2: Only update texture if video has data **
+                // ** FIX 2: Check video readiness for smoother performance **
                 if (video.readyState >= video.HAVE_CURRENT_DATA) {
                     videoTexture.needsUpdate = true;
                 }
@@ -837,7 +838,7 @@
             } else {
                 distanceVolumeFactor = 1.0 - (distance - MIN_DISTANCE_VOLUME_ONE) / (MAX_HEARING_DISTANCE - MIN_DISTANCE_VOLUME_ONE);
             }
-            // video.volume now gets set here
+            // ** FIX 1: Set video volume based on window position and player distance **
             video.volume = windowVolumeFactor * distanceVolumeFactor;
 
             // MOVEMENT & COLLISION 
@@ -883,7 +884,6 @@
             const time = Date.now() * 0.001;
             for(let id in otherPlayers) {
                 const p = otherPlayers[id];
-                // Increased INTERPOLATION_FACTOR (0.25) makes movement more responsive and less delayed
                 p.mesh.position.lerp(p.tPos, INTERPOLATION_FACTOR); 
                 p.mesh.rotation.y += (p.tRot - p.mesh.rotation.y)*INTERPOLATION_FACTOR;
                 
