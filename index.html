@@ -117,7 +117,7 @@
     <script type="module">
         import * as THREE from 'three';
         import { initializeApp } from 'firebase/app';
-        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, deleteDoc, getDoc } from 'firebase/firestore'; // Added getDoc
+        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, deleteDoc, getDoc } from 'firebase/firestore'; 
 
         // 1. CONFIG
         const firebaseConfig = {
@@ -142,7 +142,8 @@
         } catch(e) { log("CONFIG ERROR: Firebase initialization failed: " + e.message); }
 
         // 2. VARIABLES
-        const myId = 'player_' + Math.floor(Math.random() * 999999);
+        // 👇 FIX: Reverted to random ID, as no authentication is required for entry.
+        const myId = 'player_' + Math.floor(Math.random() * 999999); 
         let myName = "Viewer";
         let roomCode = "0";
         let isPlaying = false;
@@ -585,13 +586,13 @@
             document.getElementById('room-display').innerText=`GALLERY: ${r} ${myName === GOD_NAME ? '(GOD MODE)' : ''}`;
             isPlaying=true;
             
-            video.muted = false;
+            // ** FIX 1: Set video to muted for guaranteed autoplay success on user interaction **
+            video.muted = true; 
+            
+            // Start playback
             video.play().catch(e => log("ERROR: Video playback failed. Check video path (sky.mp4) and ensure it's on a live server: " + e.message));
 
-            setTimeout(() => {
-                videoTexture.needsUpdate = true;
-            }, 50);
-
+            // 👇 FIX: Start multiplayer directly without authentication
             initMultiplayer();
         });
 
@@ -601,6 +602,7 @@
             const playersRef = collection(db, "rooms", roomCode, "players");
 
             // *** FIX 1: Ensure room document exists before setting up listeners ***
+            // This relies on the security rule allowing 'create' for 'if true'.
             try {
                 const roomSnap = await getDoc(roomRef);
                 if (!roomSnap.exists()) {
@@ -610,8 +612,8 @@
                      log("Room document exists.");
                 }
             } catch (e) {
-                log("FATAL ERROR: Could not create/check room document: " + e.message);
-                // Stop further multiplayer setup if room fails
+                // If this fails, the rule is blocking the *unauthenticated* user.
+                log("FATAL ERROR: Could not create/check room document. Check Firestore Rules for /rooms/{roomId}: " + e.message);
                 return; 
             }
             
@@ -674,6 +676,7 @@
             // Position broadcast loop: **50ms interval for responsiveness**
             setInterval(() => {
                 if(isPlaying) {
+                    // This relies on the security rule allowing 'create'/'update' for 'if true' in the /players subcollection.
                     setDoc(doc(playersRef, myId), {
                         x:camera.position.x, 
                         y:camera.position.y-10, 
@@ -682,7 +685,7 @@
                         name:myName, 
                         time:Date.now()
                     }, { merge: true }).catch((e)=>{ 
-                         console.warn("Update failed, retrying soon.", e.message);
+                         console.warn("Update failed. Check Firestore Rules for /players/{playerId}:", e.message);
                     });
                 }
             }, POSITION_UPDATE_INTERVAL); 
@@ -692,7 +695,14 @@
         const doorBtn = document.getElementById('door-btn');
         doorBtn.addEventListener('click', () => {
             const newState = !isDoorOpen;
-            updateDoc(doc(db, "rooms", roomCode), {doorOpen: newState}).catch(()=>{ log("ERROR: Failed to update door state. Check permissions."); });
+            // NOTE: This update will FAIL if Firestore rules require authentication.
+            updateDoc(doc(db, "rooms", roomCode), {doorOpen: newState})
+                .then(() => {
+                    log(`Door state updated to ${newState}`);
+                })
+                .catch((error) => { 
+                    log("ERROR: Failed to update door state. Access Denied. Check Firestore Rules for /rooms/{roomId} 'update' permission."); 
+                });
         });
 
         windowCloseBtn.addEventListener('click', () => {
@@ -700,7 +710,7 @@
             windowCloseBtn.innerText = isWindowClosed ? "🪟 OPEN WINDOW" : "🪟 CLOSE WINDOW";
         });
         
-        // --- JOYSTICK CONTROLS (Omitted for brevity, assumed functional) ---
+        // --- JOYSTICK CONTROLS (Retained) ---
         let joyId=null, lookId=null;
         let move={x:0,y:0}, lastLook={x:0,y:0};
         
@@ -791,8 +801,10 @@
             requestAnimationFrame(animate);
 
             if (isPlaying) {
-                if (video.readyState >= video.HAVE_CURRENT_DATA) videoTexture.needsUpdate = true;
-                if (video.paused && !video.muted) video.play().catch(e => { console.warn("Warning: Video attempted restart but failed."); });
+                // ** FIX 2: Only update texture if video has data **
+                if (video.readyState >= video.HAVE_CURRENT_DATA) {
+                    videoTexture.needsUpdate = true;
+                }
             }
 
             // Door animation
@@ -825,6 +837,7 @@
             } else {
                 distanceVolumeFactor = 1.0 - (distance - MIN_DISTANCE_VOLUME_ONE) / (MAX_HEARING_DISTANCE - MIN_DISTANCE_VOLUME_ONE);
             }
+            // video.volume now gets set here
             video.volume = windowVolumeFactor * distanceVolumeFactor;
 
             // MOVEMENT & COLLISION 
