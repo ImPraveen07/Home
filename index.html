@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Art Gallery Pro - Bay Window Scene</title>
+    <title>Art Gallery Pro - God Mode Edition (Smoother)</title>
     <style>
         /* Base Styling */
         body { margin: 0; overflow: hidden; background-color: #f0f0f0; touch-action: none; font-family: 'Georgia', serif; user-select: none; -webkit-user-select: none; }
@@ -83,7 +83,7 @@
     <div id="debug-console">Gallery System Ready.</div>
 
     <div id="login-screen">
-        <h1>ART GALLERY PRO</h1>
+        <h1>ART GALLERY PRO - GOD MODE</h1>
         <input type="text" id="username" placeholder="ENTER VIEWER NAME" maxlength="10">
         <input type="number" id="room-code" placeholder="GALLERY ID (e.g. 1)" maxlength="5">
         <button id="join-btn">ENTER GALLERY</button>
@@ -119,16 +119,16 @@
         import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
 
         // 1. CONFIG
-        const firebaseConfig = {
-            // WARNING: REPLACE THIS WITH YOUR ACTUAL FIREBASE CONFIG
-            apiKey: "AIzaSyC9rehsf-0jkb9dAeT1-0Z1C-yRJ0YI9dA",
-            authDomain: "gymnm-ce84b.firebaseapp.com",
-            projectId: "gymnm-ce84b",
-            storageBucket: "gymnm-ce84b.appspot.com",
-            messagingSenderId: "474926929394",
-            appId: "1:474926929394:web:6abdb807caba2751a5c76b",
-            measurementId: "G-6R9S8LYZNF"
-        };
+const firebaseConfig = {
+  apiKey: "AIzaSyBDBH0OI_4y2lhONsUwzla987CJdyqafPE",
+  authDomain: "haij-7e2f3.firebaseapp.com",
+  databaseURL: "https://haij-7e2f3-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "haij-7e2f3",
+  storageBucket: "haij-7e2f3.firebasestorage.app",
+  messagingSenderId: "1071439646863",
+  appId: "1:1071439646863:web:5dc1650e1dabbe9de0e0fa",
+  measurementId: "G-CXVGW0NMLP"
+};
 
         const logDiv = document.getElementById('debug-console');
         function log(msg) { console.log(msg); logDiv.innerText = "> " + msg; }
@@ -148,6 +148,15 @@
         let isSitting = false;
         let otherPlayers = {}; 
         
+        // **GOD MODE CONFIG**
+        const GOD_NAME = "Praveen"; // The name that gets the special character
+        const GOD_COLOR = 0xffa500; // Orange/Gold for divine glow
+        const REGULAR_COLOR = 0x888888;
+        
+        // **SMOOTHNESS CONFIG**
+        const POSITION_UPDATE_INTERVAL = 50; // Faster update: 50ms (was 100ms)
+        const INTERPOLATION_FACTOR = 0.2;     // Quicker catch-up for smooth movement (was 0.1)
+
         // Door State
         let isDoorOpen = false;
         let doorMesh; 
@@ -199,7 +208,7 @@
         const ambLight = new THREE.AmbientLight(0xffffff, 1.0); scene.add(ambLight);
         const pLight = new THREE.PointLight(0xffffff, 1.2, 800); pLight.position.set(0, 100, 0); scene.add(pLight); 
 
-        // 4. TEXTURES & MATERIALS
+        // 4. TEXTURES & MATERIALS (Original materials remain)
         const wallMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.8, metalness: 0.0 });
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.6, metalness: 0.1 });
         const ceilingMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, metalness: 0.0 });
@@ -216,7 +225,7 @@
         
         const curtainMat = new THREE.MeshStandardMaterial({ color: 0xcac7b8, roughness: 0.8, side: THREE.DoubleSide }); 
 
-        // 5. VIDEO TEXTURE SETUP
+        // 5. VIDEO TEXTURE SETUP (Original setup)
         const video = document.getElementById('skyVideo');
         video.volume = 0.0; 
 
@@ -244,7 +253,7 @@
             fog: false
         });
         
-        // 6. BUILD ROOM 
+        // 6. BUILD ROOM (Original room building functions remain)
         const galleryObjects = []; 
         
         const H=800; // Total Depth
@@ -383,7 +392,7 @@
         doorMesh.position.set(DOOR_CLOSED_POS, floorY + DOOR_HEIGHT/2, 0); 
         scene.add(doorMesh);
         
-        // 7. FURNITURE
+        // 7. FURNITURE (Original furniture remains)
         function createFurniture() {
             const g = new THREE.Group();
             
@@ -410,7 +419,7 @@
         }
         createFurniture(); 
         
-        // --- BAY WINDOW SCENE ---
+        // --- BAY WINDOW SCENE (Original bay window setup remains) ---
         function createBayWindowScene() {
             const group = new THREE.Group();
             
@@ -486,6 +495,83 @@
         }
 
 
+        // **GOD MODE PLAYER CREATION FUNCTION**
+        function createGodPlayer(name) {
+            const playerGroup = new THREE.Group();
+            
+            // 1. God Body (Glowing)
+            const godMat = new THREE.MeshStandardMaterial({
+                color: GOD_COLOR, 
+                emissive: GOD_COLOR, 
+                emissiveIntensity: 0.5, // Subtle glow
+                roughness: 0.1, 
+                metalness: 0.9 
+            });
+            const body = new THREE.Mesh(new THREE.CapsuleGeometry(7, 25, 4, 8), godMat); // Slightly larger body
+            body.position.y = 0;
+            playerGroup.add(body);
+
+            // 2. God Particle Aura (Points)
+            const particleCount = 200;
+            const particleGeo = new THREE.BufferGeometry();
+            const positions = [];
+            const colors = [];
+            const color = new THREE.Color(GOD_COLOR);
+            
+            for (let i = 0; i < particleCount; i++) {
+                // Random position within a sphere around the player
+                const radius = 15 + Math.random() * 5;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(Math.random() * 2 - 1);
+                
+                positions.push(
+                    radius * Math.sin(phi) * Math.cos(theta), // X
+                    radius * Math.sin(phi) * Math.sin(theta) + 10, // Y offset up
+                    radius * Math.cos(phi) // Z
+                );
+                
+                colors.push(color.r, color.g, color.b);
+            }
+
+            particleGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            particleGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+            const particleMat = new THREE.PointsMaterial({
+                size: 3,
+                vertexColors: true,
+                blending: THREE.AdditiveBlending,
+                transparent: true,
+                depthWrite: false,
+                sizeAttenuation: true
+            });
+            
+            const aura = new THREE.Points(particleGeo, particleMat);
+            playerGroup.add(aura);
+            
+            // 3. God Name Tag
+            const canvas = document.createElement('canvas'); 
+            canvas.width=300; canvas.height=80;
+            const ctx = canvas.getContext('2d'); 
+            ctx.font="bold 40px Arial"; 
+            ctx.fillStyle="#FFD700"; // Gold color for the name
+            ctx.strokeStyle="#000000";
+            ctx.lineWidth=3;
+            ctx.textAlign="center"; 
+            ctx.strokeText(`✨ ${name} ✨`, 150, 50); // Add flair
+            ctx.fillText(`✨ ${name} ✨`, 150, 50);
+
+            const spriteMat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas) });
+            const nameTag = new THREE.Sprite(spriteMat);
+            nameTag.position.y = 35; // Higher position
+            nameTag.scale.set(30, 8, 1); 
+            playerGroup.add(nameTag);
+            
+            // Attach the aura mesh to the group so we can animate it later
+            playerGroup.userData.auraMesh = aura;
+
+            return playerGroup;
+        }
+
         // 8. LOGIC 
         document.getElementById('join-btn').addEventListener('click', () => {
             const u = document.getElementById('username').value.trim();
@@ -494,9 +580,11 @@
                  log("ERROR: Enter Name & Code");
                  return;
             }
-            myName = u; roomCode = "room_" + r;
+            // Capitalize the name entered to ensure it matches the GOD_NAME check consistently
+            myName = u.charAt(0).toUpperCase() + u.slice(1); 
+            roomCode = "room_" + r;
             document.getElementById('login-screen').style.display='none';
-            document.getElementById('room-display').innerText=`GALLERY: ${r}`;
+            document.getElementById('room-display').innerText=`GALLERY: ${r} ${myName === GOD_NAME ? '(GOD MODE)' : ''}`;
             isPlaying=true;
             
             // CRITICAL FIX: Unmute video and initiate playback after user interaction
@@ -509,6 +597,26 @@
 
             initMultiplayer();
         });
+
+        function createStandardPlayer(p) {
+            // Reusable function for standard player creation
+            const g = new THREE.Group();
+            
+            // Player body (Capsule)
+            const b = new THREE.Mesh(new THREE.CapsuleGeometry(6,20,4,8), new THREE.MeshStandardMaterial({color:REGULAR_COLOR}));
+            g.add(b);
+            
+            // Player name tag (Sprite)
+            const c=document.createElement('canvas'); c.width=256; c.height=64;
+            const ctx=c.getContext('2d'); ctx.font="bold 30px Arial"; ctx.fillStyle="#333"; ctx.textAlign="center"; ctx.fillText(p.name,128,40);
+            const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c)}));
+            s.position.y=25; // Positioned above the body mesh
+            s.scale.set(20,5,1); 
+            g.add(s);
+            
+            return g;
+        }
+
 
         function initMultiplayer() {
             const roomRef = doc(db, "rooms", roomCode);
@@ -538,29 +646,30 @@
                     const id = d.id;
                     const p = d.data();
                     
-                    if(now - p.time > 10000) return; // Ignore stale data
+                    if(now - p.time > 10000) return; // Ignore stale data (10 seconds)
                     if(id === myId) return;
 
                     activePlayerIds.add(id);
 
                     if(!otherPlayers[id]) {
-                        // Create new player mesh and label
-                        const g = new THREE.Group();
-                        // Player body (Capsule)
-                        const b = new THREE.Mesh(new THREE.CapsuleGeometry(6,20,4,8), new THREE.MeshStandardMaterial({color:0x888888}));
-                        g.add(b);
+                        // --- PLAYER CREATION LOGIC MODIFIED ---
+                        let newPlayerMesh;
+                        const isGodPlayer = p.name === GOD_NAME;
+
+                        if(isGodPlayer) {
+                            newPlayerMesh = createGodPlayer(p.name);
+                        } else {
+                            newPlayerMesh = createStandardPlayer(p);
+                        }
                         
-                        // Player name tag (Sprite)
-                        const c=document.createElement('canvas'); c.width=256; c.height=64;
-                        const ctx=c.getContext('2d'); ctx.font="bold 30px Arial"; ctx.fillStyle="#333"; ctx.textAlign="center"; ctx.fillText(p.name,128,40);
-                        const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c)}));
-                        s.position.y=25; // Positioned above the body mesh
-                        s.scale.set(20,5,1); 
-                        g.add(s);
-                        
-                        scene.add(g);
-                        otherPlayers[id] = { mesh:g, tPos: new THREE.Vector3(p.x,p.y,p.z), tRot: p.ry };
-                        g.position.set(p.x,p.y,p.z);
+                        scene.add(newPlayerMesh);
+                        otherPlayers[id] = { 
+                            mesh: newPlayerMesh, 
+                            tPos: new THREE.Vector3(p.x, p.y, p.z), 
+                            tRot: p.ry, 
+                            isGod: isGodPlayer
+                        };
+                        newPlayerMesh.position.set(p.x,p.y,p.z);
                     } else {
                         // Update existing player target position
                         otherPlayers[id].tPos.set(p.x,p.y,p.z);
@@ -577,33 +686,38 @@
                 });
             });
 
-            // Position broadcast loop
+            // Position broadcast loop: **NOW FASTER (50ms)**
             setInterval(() => {
-                if(isPlaying) setDoc(doc(playersRef, myId), {
-                    x:camera.position.x, 
-                    y:camera.position.y-10, // Adjust Y to be ground-level for the capsule
-                    z:camera.position.z,
-                    ry:camera.rotation.y, 
-                    name:myName, 
-                    time:Date.now()
-                }, { merge: true }).catch(()=>{ log("ERROR: Failed to update player position."); });
-            }, 100);
+                if(isPlaying) {
+                    setDoc(doc(playersRef, myId), {
+                        x:camera.position.x, 
+                        y:camera.position.y-10, // Adjust Y to be ground-level for the capsule
+                        z:camera.position.z,
+                        ry:camera.rotation.y, 
+                        name:myName, 
+                        time:Date.now()
+                    }, { merge: true }).catch((e)=>{ 
+                         // Log a warning, but don't stop the whole debug console just for one failure
+                         console.warn("Update failed, retrying soon.", e.message);
+                    });
+                }
+            }, POSITION_UPDATE_INTERVAL); // Uses the 50ms constant
         }
         
-        // --- DOOR INTERACTION ---
+        // --- DOOR INTERACTION (Original logic remains) ---
         const doorBtn = document.getElementById('door-btn');
         doorBtn.addEventListener('click', () => {
             const newState = !isDoorOpen;
             updateDoc(doc(db, "rooms", roomCode), {doorOpen: newState}).catch(()=>{ log("ERROR: Failed to update door state."); });
         });
 
-        // --- WINDOW INTERACTION ---
+        // --- WINDOW INTERACTION (Original logic remains) ---
         windowCloseBtn.addEventListener('click', () => {
             isWindowClosed = !isWindowClosed;
             windowCloseBtn.innerText = isWindowClosed ? "🪟 OPEN WINDOW" : "🪟 CLOSE WINDOW";
         });
         
-        // --- JOYSTICK CONTROLS (Unchanged) ---
+        // --- JOYSTICK CONTROLS (Original logic remains) ---
         let joyId=null, lookId=null;
         let move={x:0,y:0}, lastLook={x:0,y:0};
         
@@ -694,7 +808,7 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            // 1. VIDEO TEXTURE UPDATE & PLAYBACK CHECK
+            // 1. VIDEO TEXTURE UPDATE & PLAYBACK CHECK (Original logic remains)
             if (isPlaying) {
                 if (video.readyState >= video.HAVE_CURRENT_DATA) {
                     videoTexture.needsUpdate = true;
@@ -708,11 +822,11 @@
             }
 
 
-            // 2. DOOR ANIMATION
+            // 2. DOOR ANIMATION (Original logic remains)
             const targetXDoor = isDoorOpen ? DOOR_OPEN_POS : DOOR_CLOSED_POS; 
             doorMesh.position.x += (targetXDoor - doorMesh.position.x) * DOOR_SPEED;
 
-            // 3. ADVANCED WINDOW CLOSING/OPENING
+            // 3. ADVANCED WINDOW CLOSING/OPENING (Original logic remains)
             const targetXGlass = isWindowClosed ? GLASS_CLOSED_X : (GLASS_START_X - windowGlassMesh.geometry.parameters.width); 
             const currentXGlass = windowGlassMesh.position.x;
             windowGlassMesh.position.x += (targetXGlass - currentXGlass) * CLOSE_SPEED;
@@ -724,7 +838,7 @@
             closureRatio = Math.max(0, Math.min(1, closureRatio));
 
 
-            // 4. VIDEO SOUND CONTROL (Window Damping and Distance Falloff)
+            // 4. VIDEO SOUND CONTROL (Window Damping and Distance Falloff - Original logic remains)
             
             // A. WINDOW CLOSURE LOGIC
             const windowVolumeFactor = 1.0 - closureRatio;
@@ -752,7 +866,7 @@
             video.volume = windowVolumeFactor * distanceVolumeFactor;
 
 
-            // 5. MOVEMENT & COLLISION
+            // 5. MOVEMENT & COLLISION (Original logic remains)
             if(!isSitting && (move.x!==0 || move.y!==0)) {
                 const oldX = camera.position.x;
                 const oldZ = camera.position.z;
@@ -785,7 +899,7 @@
                 }
             }
 
-            // 6. BUTTON VISIBILITY (Door and Window)
+            // 6. BUTTON VISIBILITY (Door and Window - Original logic remains)
             const isNearDoor = camera.position.z > -150 && camera.position.z < 150 && camera.position.x > -100 && camera.position.x < 100 && isPlaying;
             const isNearWindow = camera.position.z < (BACK_Z + 100) && camera.position.x > -150 && camera.position.x < 150 && isPlaying;
 
@@ -793,10 +907,23 @@
             windowCloseBtn.style.display = isNearWindow ? "block" : "none";
 
             // 7. MULTIPLAYER ANIMATION
+            const time = Date.now() * 0.001;
             for(let id in otherPlayers) {
                 const p = otherPlayers[id];
-                p.mesh.position.lerp(p.tPos, 0.1);
-                p.mesh.rotation.y += (p.tRot - p.mesh.rotation.y)*0.1;
+                // **SMOOTHER INTERPOLATION HERE (0.2)**
+                p.mesh.position.lerp(p.tPos, INTERPOLATION_FACTOR); 
+                p.mesh.rotation.y += (p.tRot - p.mesh.rotation.y)*INTERPOLATION_FACTOR;
+                
+                // GOD MODE AURA ANIMATION
+                if (p.isGod) {
+                    const aura = p.mesh.userData.auraMesh;
+                    if (aura) {
+                        // Slowly rotate the aura
+                        aura.rotation.y = time * 0.5; 
+                        // Gently move particles up and down
+                        aura.position.y = Math.sin(time * 3) * 1.5;
+                    }
+                }
             }
 
             document.getElementById('timer').style.display='none';
