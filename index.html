@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Art Gallery Pro - God Mode Edition (Smoother)</title>
+    <title>Art Gallery Pro - Real-Time God Mode Edition (Exit Fixed)</title>
     <style>
         /* Base Styling */
         body { margin: 0; overflow: hidden; background-color: #f0f0f0; touch-action: none; font-family: 'Georgia', serif; user-select: none; -webkit-user-select: none; }
@@ -34,21 +34,81 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
 
-        /* HUD */
-        #ui-layer { position: absolute; top: 40px; width: 100%; text-align: center; pointer-events: none; z-index: 50; }
-        #room-display { font-size: 14px; color: #555; background: rgba(255,255,255,0.7); padding: 5px 15px; border-radius: 15px; display: inline-block; border: 1px solid #ccc; }
+        /* HUD - Top Bar */
+        #ui-layer { 
+            position: absolute; top: 10px; width: 100%; pointer-events: none; z-index: 50; 
+            display: flex; justify-content: space-between; align-items: flex-start; padding: 0 10px;
+        }
+        #room-display { 
+            font-size: 14px; color: #555; background: rgba(255,255,255,0.7); 
+            padding: 5px 15px; border-radius: 15px; display: inline-block; border: 1px solid #ccc; 
+            pointer-events: auto;
+        }
+
+        /* PLAYER LIST & MAP CONTAINER (Top Left) */
+        #info-container {
+            display: flex;
+            flex-direction: column;
+            pointer-events: auto;
+        }
+        
+        #player-list-box {
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            min-width: 150px;
+        }
+        #player-list-box h3 {
+            margin: 0 0 5px 0;
+            font-size: 14px;
+            color: #ffd700;
+            border-bottom: 1px solid #444;
+            padding-bottom: 3px;
+        }
+        #player-list-box ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #player-list-box ul li {
+            padding: 2px 0;
+        }
+
+        /* MINIMAP STYLING */
+        #minimap-canvas {
+            border: 2px solid #333;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 5px;
+            display: none; /* Starts hidden, shown after join */
+        }
+        
 
         /* ACTION BUTTONS */
         .action-btn {
-            position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%);
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             padding: 20px 40px; font-size: 20px; font-weight: bold; color: #fff;
             background: #555; border: 4px solid #fff; border-radius: 50px;
             cursor: pointer; display: none; z-index: 60;
             box-shadow: 0 0 30px rgba(0,0,0,0.3); animation: pulse 1s infinite alternate;
-            pointer-events: auto; /* Allow interaction */
+            pointer-events: auto; 
         }
         #door-btn { background: #aa0000; box-shadow: 0 0 30px rgba(170,0,0,0.4); top: 50%; width: 250px; }
         #close-window-btn { background: #008080; box-shadow: 0 0 30px rgba(0,128,128,0.4); top: 75%; width: 250px; }
+        
+        /* EXIT BUTTON STYLING (Top Right) */
+        #exit-btn {
+            padding: 10px 20px; background: #ff4444; color: #fff; border: none;
+            font-weight: bold; font-size: 16px; cursor: pointer; border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            pointer-events: auto; 
+            margin-left: auto; 
+        }
+
 
         @keyframes pulse { from { transform: translate(-50%,-50%) scale(1); } to { transform: translate(-50%,-50%) scale(1.1); } }
 
@@ -83,15 +143,25 @@
     <div id="debug-console">Gallery System Ready.</div>
 
     <div id="login-screen">
-        <h1>ART GALLERY PRO - GOD MODE</h1>
+        <h1>ART GALLERY PRO - REAL-TIME GOD MODE</h1>
         <input type="text" id="username" placeholder="ENTER VIEWER NAME" maxlength="10">
         <input type="number" id="room-code" placeholder="GALLERY ID (e.g. 1)" maxlength="5">
         <button id="join-btn">ENTER GALLERY</button>
     </div>
 
     <div id="ui-layer">
-        <div id="timer" style="display: none;"></div> 
-        <div id="room-display">OFFLINE</div>
+        <div id="info-container">
+            <div id="player-list-box" style="display: none;">
+                <h3 id="player-count">Viewers (0)</h3>
+                <ul id="player-list"></ul>
+            </div>
+            <canvas id="minimap-canvas" width="150" height="150"></canvas>
+        </div>
+
+        <div id="room-info" style="display: flex; flex-direction: column; align-items: flex-end;">
+            <div id="room-display">OFFLINE</div>
+            <button id="exit-btn" style="display: none;">❌ EXIT GALLERY</button>
+        </div>
     </div>
 
     <button id="door-btn" class="action-btn">🚪 OPEN DOOR</button>
@@ -146,18 +216,19 @@
         let roomCode = "0";
         let isPlaying = false;
         let otherPlayers = {}; 
-        let myPlayerMesh = null; // FIX: Variable to hold the local player's mesh
+        let allPlayersData = {}; 
+        let myPlayerMesh = null; 
         
         // **GOD MODE CONFIG**
-        const GOD_NAME = "Praveen"; // The name that gets the special character
-        const GOD_COLOR = 0xffa500; // Orange/Gold for divine glow
+        const GOD_NAME = "Praveen"; 
+        const GOD_COLOR = 0xffa500; 
         const REGULAR_COLOR = 0x888888;
         
-        // **SMOOTHNESS CONFIG**
-        const POSITION_UPDATE_INTERVAL = 50; // Faster update: 50ms
-        const INTERPOLATION_FACTOR = 0.25;    // Quicker catch-up for smooth movement
+        // **REAL-TIME SMOOTHNESS & INTERPOLATION CONFIG**
+        const POSITION_UPDATE_INTERVAL = 10; 
+        const INTERPOLATION_FACTOR = 0.4; 
 
-        // Door State
+        // Door State (Remains unchanged)
         let isDoorOpen = false;
         let doorMesh; 
         const GAP_SIZE = 80; 
@@ -170,21 +241,32 @@
         // Collision constants
         const WALL_Z_POS = 0; 
         const PLAYER_RADIUS = 10; 
-        const DOOR_LEFT_X = -(GAP_SIZE / 2); // -40
-        const DOOR_RIGHT_X = (GAP_SIZE / 2); // 40
+        const DOOR_LEFT_X = -(GAP_SIZE / 2); 
+        const DOOR_RIGHT_X = (GAP_SIZE / 2); 
 
         const floorY = -50;
+        
+        // Minimap constants
+        const MINIMAP_SIZE = 150; 
+        const W = 800; 
+        const H = 800; 
+        const MAP_SCALE = MINIMAP_SIZE / W; 
 
-        // Window Control Variables
+        // Window Control Variables (Remains unchanged)
         let isWindowClosed = false;
         let windowGlassMesh;
         const CLOSE_SPEED = 0.005; 
         const GLASS_START_X = -30; 
         const GLASS_CLOSED_X = 0; 
         let windowCloseBtn = document.getElementById('close-window-btn');
+        let exitBtn = document.getElementById('exit-btn');
+        const MAP_CANVAS = document.getElementById('minimap-canvas');
+        const MAP_CTX = MAP_CANVAS.getContext('2d');
+        const PLAYER_LIST_UL = document.getElementById('player-list');
+        const PLAYER_COUNT_H3 = document.getElementById('player-count');
+        const PLAYER_LIST_BOX = document.getElementById('player-list-box');
 
-
-        // 3. SCENE SETUP
+        // 3. SCENE SETUP (Remains unchanged)
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xf0f0f0);
         scene.fog = new THREE.Fog(0xf0f0f0, 10, 800); 
@@ -202,11 +284,11 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Lights
+        // Lights (Remains unchanged)
         const ambLight = new THREE.AmbientLight(0xffffff, 1.0); scene.add(ambLight);
         const pLight = new THREE.PointLight(0xffffff, 1.2, 800); pLight.position.set(0, 100, 0); scene.add(pLight); 
 
-        // 4. TEXTURES & MATERIALS
+        // 4. TEXTURES & MATERIALS (Remains unchanged)
         const wallMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.8, metalness: 0.0 });
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.6, metalness: 0.1 });
         const ceilingMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, metalness: 0.0 });
@@ -223,12 +305,11 @@
         
         const curtainMat = new THREE.MeshStandardMaterial({ color: 0xcac7b8, roughness: 0.8, side: THREE.DoubleSide }); 
 
-        // 5. VIDEO TEXTURE SETUP 
+        // 5. VIDEO TEXTURE SETUP (Remains unchanged)
         const video = document.getElementById('skyVideo');
         video.volume = 0.0; 
 
         const videoTexture = new THREE.VideoTexture(video);
-        // ** FIX 2: Optimized Texture Filtering for performance/lag **
         videoTexture.minFilter = THREE.NearestFilter;
         videoTexture.magFilter = THREE.NearestFilter;
         videoTexture.format = THREE.RGBAFormat;
@@ -236,9 +317,8 @@
         videoTexture.wrapT = THREE.ClampToEdgeWrapping; 
 
         const VIDEO_ASPECT = 16 / 9;
-        const W = 800; // Total Width
-        const W_H = 125; // Window height 
-        const W_W = 230; // Window width (approx)
+        const W_H = 125; 
+        const W_W = 230; 
         
         const GEOMETRY_ASPECT = (W_W * 2) / (W_H * 2); 
         const V_REPEAT_FACTOR = GEOMETRY_ASPECT / VIDEO_ASPECT;
@@ -251,22 +331,18 @@
             fog: false
         });
         
-        // 6. BUILD ROOM 
+        // 6. BUILD ROOM (Remains unchanged)
         const galleryObjects = []; 
         
-        const H=800; // Total Depth
-        const T=200; // Room/Wall Height
+        const T=200; 
         const maxPos = W/2 - 10; 
 
         const CEILING_Y = floorY + T; 
         const WALL_CENTER_Y = floorY + T/2; 
         
-        // --- WINDOW CONFIG ---
         const W_D = 30; 
-        const BACK_Z = -400; // Z-position of the back wall
+        const BACK_Z = -400; 
 
-
-        // --- CUSTOM WALL BUILDER FOR BAY WINDOW CUTOUT ---
         function buildWallWithCutout(w, h, pz) {
             const windowStart = -W_W/2; 
             const windowEnd = W_W/2; 
@@ -278,28 +354,24 @@
             const wallGroup = new THREE.Group();
             wallGroup.position.set(0, WALL_CENTER_Y, pz);
 
-            // Left wall segment
             const leftW = w/2 + windowStart;
             const leftH = h;
             const leftMesh = new THREE.Mesh(new THREE.PlaneGeometry(leftW, leftH), wallMat);
             leftMesh.position.x = windowStart - leftW/2;
             wallGroup.add(leftMesh); galleryObjects.push(leftMesh);
 
-            // Right wall segment
             const rightW = w/2 - windowEnd;
             const rightH = h;
             const rightMesh = new THREE.Mesh(new THREE.PlaneGeometry(rightW, rightH), wallMat);
             rightMesh.position.x = windowEnd + rightW/2;
             wallGroup.add(rightMesh); galleryObjects.push(rightMesh);
 
-            // Top beam
             const topH = h - (windowTop - windowBottom);
             const topYOffset = windowTop + (topH / 2) - WALL_CENTER_Y;
             const topMesh = new THREE.Mesh(new THREE.PlaneGeometry(windowEnd - windowStart, topH), wallMat);
             topMesh.position.y = topYOffset;
             wallGroup.add(topMesh); galleryObjects.push(topMesh);
 
-            // Bottom support (Wall below the cutout)
             const bottomH = windowBottom - floorY;
             const bottomYOffset = windowBottom - bottomH/2 - WALL_CENTER_Y;
             const bottomMesh = new THREE.Mesh(new THREE.PlaneGeometry(windowEnd - windowStart, bottomH), wallMat);
@@ -309,8 +381,6 @@
             scene.add(wallGroup);
         }
 
-
-        // --- Standard Wall Builder ---
         function buildWallGroup(w, h, px, py, pz, rx, ry, material) {
             const g = new THREE.Group();
             g.position.set(px, py, pz);
@@ -322,14 +392,11 @@
             scene.add(g);
         }
 
-        // --- GALLERY BUILD ---
         const HALF_W = W/2;
         const HALF_H = H/2;
         
-        // Floor (Y=-50)
         buildWallGroup(W,H, 0,-50,0, -Math.PI/2,0, floorMat); 
         
-        // CEILING 
         function createCeiling() {
             const geometry = new THREE.PlaneGeometry(W, H, 10, 10); 
             const mesh = new THREE.Mesh(geometry, ceilingMat); 
@@ -339,14 +406,12 @@
         }
         createCeiling();
         
-        // Walls
         buildWallWithCutout(W,T, BACK_Z);
         createBayWindowScene(); 
         buildWallGroup(W,T, 0,WALL_CENTER_Y,HALF_H, 0,Math.PI, wallMat);
         buildWallGroup(H,T, -HALF_W,WALL_CENTER_Y,0, 0,Math.PI/2, wallMat);
         buildWallGroup(H,T, HALF_W,WALL_CENTER_Y,0, 0,-Math.PI/2, wallMat);
 
-        // --- CENTRAL DIVIDING WALL (Door) ---
         const wallHeight = T; 
         const wallSegmentWidth = HALF_W - GAP_SIZE/2; 
         const wallSegmentCenter = HALF_W/2 + GAP_SIZE/4; 
@@ -380,13 +445,12 @@
         doorMesh.position.set(DOOR_CLOSED_POS, floorY + DOOR_HEIGHT/2, 0); 
         scene.add(doorMesh);
         
-        // 7. FURNITURE 
+        // 7. FURNITURE (Remains unchanged)
         function createFurniture() {
             const g = new THREE.Group();
             
             const pMat = new THREE.MeshStandardMaterial({color: 0x999999});
             
-            // Pedestal 1
             const leg1 = new THREE.Mesh(new THREE.CylinderGeometry(3,3,30,16), pMat);
             leg1.position.set(0, floorY + 15, -200); g.add(leg1); galleryObjects.push(leg1);
             const top1 = new THREE.Mesh(new THREE.CylinderGeometry(35,35,2,32), pMat);
@@ -394,7 +458,6 @@
             const sculpture1 = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshStandardMaterial({color: 0xaa00aa, roughness: 0.1, metalness: 0.8}));
             sculpture1.position.set(0, floorY + 35, -200); g.add(sculpture1); galleryObjects.push(sculpture1);
 
-            // Pedestal 2
             const leg2 = new THREE.Mesh(new THREE.CylinderGeometry(3,3,30,16), pMat);
             leg2.position.set(0, floorY + 15, 200); g.add(leg2); galleryObjects.push(leg2);
             const top2 = new THREE.Mesh(new THREE.CylinderGeometry(35,35,2,32), pMat);
@@ -406,59 +469,48 @@
         }
         createFurniture(); 
         
-        // --- BAY WINDOW SCENE 
         function createBayWindowScene() {
             const group = new THREE.Group();
             
             const VIEW_W = W_W * 1.5; 
             const VIEW_H = W_H * 1.5;
 
-            // 1. EXTERNAL VIEW PLANE (The Video Screen)
             const viewPlaneGeo = new THREE.PlaneGeometry(VIEW_W, VIEW_H);
             const viewPlane = new THREE.Mesh(viewPlaneGeo, unlitVideoMat);
             viewPlane.position.set(0, WALL_CENTER_Y, BACK_Z - 5); 
             group.add(viewPlane);
             
-            // 2. RECESS FRAME AND SILL
             const frameThickness = 5;
             const W_D_HALF = W_D / 2;
             const recessMat = wallMatInterior.clone();
             recessMat.color.set(0xdddddd); 
 
-            // Recess Top
             const recessTop = new THREE.Mesh(new THREE.BoxGeometry(W_W, frameThickness, W_D), recessMat);
             recessTop.position.set(0, WALL_CENTER_Y + W_H/2 + frameThickness/2, BACK_Z - W_D_HALF);
             group.add(recessTop);
 
-            // Recess Bottom/Sill 
             const sillDepth = W_D + 15;
             const sillMat = new THREE.MeshStandardMaterial({ color: 0xb5b5b5, roughness: 0.4 });
             const sill = new THREE.Mesh(new THREE.BoxGeometry(W_W + 10, 5, sillDepth), sillMat);
             sill.position.set(0, WALL_CENTER_Y - W_H/2 - 2, BACK_Z + sillDepth/2 - W_D);
             group.add(sill);
             
-            // 3. CURTAINS 
             const curtainWidth = W_W * 0.4;
             const curtainHeight = T;
             
-            // Left Curtain
             const cL = new THREE.Mesh(new THREE.PlaneGeometry(curtainWidth, curtainHeight), curtainMat);
             cL.position.set(-W_W/2 - curtainWidth/2 - 10, WALL_CENTER_Y, BACK_Z + 1); 
             group.add(cL);
             
-            // Right Curtain
             const cR = new THREE.Mesh(new THREE.PlaneGeometry(curtainWidth, curtainHeight), curtainMat);
             cR.position.set(W_W/2 + curtainWidth/2 + 10, WALL_CENTER_Y, BACK_Z + 1);
             group.add(cR);
             
-            // 4. INVISIBLE GLASS PLANE 
             const invisibleGlassGeo = new THREE.PlaneGeometry(W_W, W_H);
             const invisibleGlass = new THREE.Mesh(invisibleGlassGeo, transparentGlassMat);
             invisibleGlass.position.set(0, WALL_CENTER_Y, BACK_Z - 1); 
             group.add(invisibleGlass);
             
-
-            // 5. ADVANCED SLIDING GLASS PANEL 
             const glassPanelWidth = W_W + 5; 
             const glassPanelHeight = W_H + 5; 
             const glassThickness = 5;
@@ -468,7 +520,6 @@
                 closedWindowGlassMat
             );
             
-            // Start position: Off to the side (open)
             windowGlassMesh.position.set(
                 GLASS_START_X - glassPanelWidth, 
                 WALL_CENTER_Y, 
@@ -482,12 +533,11 @@
         }
 
 
-        // 8. PLAYER CREATION FUNCTIONS
+        // 8. PLAYER CREATION FUNCTIONS (Remains unchanged)
         
         function createGodPlayer(name) {
             const playerGroup = new THREE.Group();
             
-            // 1. God Body 
             const godMat = new THREE.MeshStandardMaterial({
                 color: GOD_COLOR, 
                 emissive: GOD_COLOR, 
@@ -499,7 +549,6 @@
             body.position.y = 0;
             playerGroup.add(body);
 
-            // 2. God Particle Aura 
             const particleCount = 200;
             const particleGeo = new THREE.BufferGeometry();
             const positions = [];
@@ -529,7 +578,6 @@
             const aura = new THREE.Points(particleGeo, particleMat);
             playerGroup.add(aura);
             
-            // 3. God Name Tag
             const canvas = document.createElement('canvas'); 
             canvas.width=300; canvas.height=80;
             const ctx = canvas.getContext('2d'); 
@@ -553,14 +601,11 @@
         }
 
         function createStandardPlayer(p) {
-            // Reusable function for standard player creation (non-God)
             const g = new THREE.Group();
             
-            // ** FIX 3: Standard Player body (Capsule - same shape as God, just different material) **
             const b = new THREE.Mesh(new THREE.CapsuleGeometry(6,20,4,8), new THREE.MeshStandardMaterial({color:REGULAR_COLOR}));
             g.add(b);
             
-            // Player name tag (Sprite)
             const c=document.createElement('canvas'); c.width=256; c.height=64;
             const ctx=c.getContext('2d'); ctx.font="bold 30px Arial"; ctx.fillStyle="#333"; ctx.textAlign="center"; ctx.fillText(p.name,128,40);
             const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c)}));
@@ -571,8 +616,18 @@
             return g;
         }
 
-
         // 9. GAME LOGIC
+        // ** CRITICAL CHECK: If exit flag is set, prevent re-entry **
+        if (sessionStorage.getItem('isExiting') === 'true') {
+            log("Session exit flag detected. Clearing flag and staying on login screen.");
+            sessionStorage.removeItem('isExiting');
+            // Do not execute any further game setup until 'join-btn' is clicked again.
+        } else {
+             // Continue standard setup flow
+             document.getElementById('login-screen').style.display='flex';
+        }
+
+
         document.getElementById('join-btn').addEventListener('click', () => {
             const u = document.getElementById('username').value.trim();
             const r = document.getElementById('room-code').value.trim();
@@ -584,23 +639,39 @@
             roomCode = "room_" + r;
             document.getElementById('login-screen').style.display='none';
             document.getElementById('room-display').innerText=`GALLERY: ${r} ${myName === GOD_NAME ? '(GOD MODE)' : ''}`;
+            exitBtn.style.display = 'block'; 
+            PLAYER_LIST_BOX.style.display = 'block'; 
+            MAP_CANVAS.style.display = 'block'; 
             isPlaying=true;
             
-            // ** FIX 1: Removed `video.muted = true;` to enable immediate sound, relying on the click event **
-            // Start playback - The click handles the autoplay policy, and volume is controlled by distance/window.
-            video.play().catch(e => log("ERROR: Video playback failed. Check video path (sky.mp4) and ensure it's on a live server: " + e.message));
+            video.play().catch(e => log("ERROR: Video playback failed: " + e.message));
 
-            // *** FIX 3 PART 1: Create the local player mesh but DO NOT add to scene ***
             const isMyPlayerGod = myName === GOD_NAME;
             if (isMyPlayerGod) {
                 myPlayerMesh = createGodPlayer(myName);
             } else {
                 myPlayerMesh = createStandardPlayer({ name: myName }); 
             }
-            // scene.add(myPlayerMesh); // EXCLUDED so the local user doesn't see their own avatar.
 
             initMultiplayer();
         });
+
+        // ** CRITICAL FIX: The robust exit function **
+        async function exitGallery() {
+            log("Exiting gallery and setting session flag...");
+            
+            // 1. Set the flag: This tells the page on reload not to auto-rejoin.
+            sessionStorage.setItem('isExiting', 'true');
+
+            if (roomCode !== "0" && myId) {
+                // 2. Delete player data from Firebase
+                await deleteDoc(doc(db, "rooms", roomCode, "players", myId)).catch((e)=>{
+                     log(`Cleanup failed, data deletion may be slightly delayed: ${e.message}`);
+                });
+            }
+            // 3. Force reload: The flag ensures the reload lands on the login screen.
+            window.location.reload(); 
+        }
 
 
         async function initMultiplayer() {
@@ -611,6 +682,8 @@
                 const roomSnap = await getDoc(roomRef);
                 if (!roomSnap.exists()) {
                     await setDoc(roomRef, { doorOpen: false });
+                    isDoorOpen = false;
+                    document.getElementById('door-btn').innerText = "🚪 OPEN DOOR";
                     log("Room document created successfully.");
                 } else {
                      log("Room document exists.");
@@ -626,28 +699,40 @@
                 if(d && d.doorOpen !== undefined && d.doorOpen !== isDoorOpen) {
                     isDoorOpen = d.doorOpen;
                     document.getElementById('door-btn').innerText = isDoorOpen ? "🚪 CLOSE DOOR" : "🚪 OPEN DOOR";
+                    log(`Door state updated by network to ${isDoorOpen}`);
                 }
             }, (error) => {
                 log("Room listener error: " + error.message);
             });
 
-            // Players listener
+            // Players listener - NOW UPDATES player list and allPlayersData
             onSnapshot(playersRef, (snap) => {
                 const now = Date.now();
                 const activePlayerIds = new Set();
+                const newAllPlayersData = {}; 
+                const playerListItems = [];
 
                 snap.forEach(d => {
                     const id = d.id;
                     const p = d.data();
                     
+                    // Simple disconnect check (10s timeout)
                     if(now - p.time > 10000) return; 
-                    if(id === myId) return;
-
+                    
                     activePlayerIds.add(id);
+                    newAllPlayersData[id] = p; // Store ALL data for minimap
                     const isGodPlayer = p.name === GOD_NAME;
+                    
+                    // Add to player list
+                    const status = (id === myId) ? "(You)" : "";
+                    const godTag = isGodPlayer ? " ✨" : "";
+                    playerListItems.push(`<li>${p.name}${godTag} ${status}</li>`);
+
+
+                    // Logic for OTHER players
+                    if(id === myId) return; 
 
                     if(!otherPlayers[id]) {
-                        // ** FIX 3: Ensures other players are created correctly (God or Standard) **
                         const newPlayerMesh = isGodPlayer ? createGodPlayer(p.name) : createStandardPlayer(p);
                         
                         scene.add(newPlayerMesh);
@@ -657,26 +742,32 @@
                             tRot: p.ry, 
                             isGod: isGodPlayer
                         };
-                        newPlayerMesh.position.set(p.x,p.y,p.z);
+                        newPlayerMesh.position.set(p.x,p.y,p.z); 
+                        log(`Player ${p.name} joined.`);
                     } else {
-                        // Player exists, update target position
                         otherPlayers[id].tPos.set(p.x,p.y,p.z);
                         otherPlayers[id].tRot = p.ry;
                     }
                 });
                 
+                // Update player list HTML and counter
+                PLAYER_LIST_UL.innerHTML = playerListItems.join('');
+                PLAYER_COUNT_H3.innerText = `Viewers (${activePlayerIds.size})`;
+                allPlayersData = newAllPlayersData; 
+
                 // Cleanup disconnected players
                 Object.keys(otherPlayers).forEach(id => {
                     if(!activePlayerIds.has(id)) { 
                         scene.remove(otherPlayers[id].mesh); 
                         delete otherPlayers[id]; 
+                        log(`Player ${id} disconnected.`);
                     }
                 });
             }, (error) => {
                 log("Players listener error: " + error.message);
             });
 
-            // Position broadcast loop: **50ms interval for responsiveness**
+            // Position broadcast loop: **CRITICAL: High-frequency update**
             setInterval(() => {
                 if(isPlaying) {
                     setDoc(doc(playersRef, myId), {
@@ -693,7 +784,7 @@
             }, POSITION_UPDATE_INTERVAL); 
         }
         
-        // --- INTERACTION LOGIC ---
+        // --- INTERACTION LOGIC (Remains unchanged)---
         const doorBtn = document.getElementById('door-btn');
         doorBtn.addEventListener('click', () => {
             const newState = !isDoorOpen;
@@ -711,7 +802,10 @@
             windowCloseBtn.innerText = isWindowClosed ? "🪟 OPEN WINDOW" : "🪟 CLOSE WINDOW";
         });
         
-        // --- JOYSTICK CONTROLS (Retained) ---
+        // Exit button event listener
+        exitBtn.addEventListener('click', exitGallery);
+
+        // --- JOYSTICK CONTROLS (Remains unchanged)---
         let joyId=null, lookId=null;
         let move={x:0,y:0}, lastLook={x:0,y:0};
         
@@ -780,8 +874,10 @@
                     const t = e.changedTouches[i];
                     const dx = t.clientX - lastLook.x;
                     const dy = t.clientY - lastLook.y;
+                    
                     camera.rotation.y -= dx * 0.004; 
                     camera.rotation.x -= dy * 0.004; 
+                    
                     camera.rotation.x = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, camera.rotation.x)); 
                     lastLook = {x: t.clientX, y: t.clientY};
                 }
@@ -794,6 +890,71 @@
             }
         });
 
+        // 10. MINIMAP DRAWING FUNCTION (Remains unchanged)
+        function drawMinimap() {
+            if (!isPlaying) return;
+
+            MAP_CTX.clearRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
+            MAP_CTX.fillStyle = 'rgba(200, 200, 200, 0.5)';
+            MAP_CTX.fillRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
+            
+            MAP_CTX.strokeStyle = '#333333';
+            MAP_CTX.lineWidth = 2;
+            MAP_CTX.strokeRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
+
+            const mapZCenter = H/2 * MAP_SCALE; 
+            const doorLeftMap = (W/2 + DOOR_LEFT_X) * MAP_SCALE;
+            const doorRightMap = (W/2 + DOOR_RIGHT_X) * MAP_SCALE;
+
+            MAP_CTX.beginPath();
+            MAP_CTX.moveTo(0, mapZCenter);
+            MAP_CTX.lineTo(doorLeftMap, mapZCenter);
+            
+            if(isDoorOpen) {
+                MAP_CTX.strokeStyle = '#AA0000';
+                MAP_CTX.lineTo(doorRightMap, mapZCenter);
+                MAP_CTX.strokeStyle = '#333333';
+            } else {
+                MAP_CTX.moveTo(doorLeftMap, mapZCenter);
+                MAP_CTX.strokeStyle = '#888888';
+                MAP_CTX.lineTo(doorRightMap, mapZCenter);
+                MAP_CTX.strokeStyle = '#333333';
+            }
+            MAP_CTX.moveTo(doorRightMap, mapZCenter);
+            MAP_CTX.lineTo(MINIMAP_SIZE, mapZCenter);
+            MAP_CTX.stroke();
+
+            for (const id in allPlayersData) {
+                const p = allPlayersData[id];
+                const mapX = (p.x + W/2) * MAP_SCALE; 
+                const mapY = (p.z + H/2) * MAP_SCALE; 
+
+                MAP_CTX.beginPath();
+                MAP_CTX.arc(mapX, mapY, 4, 0, Math.PI * 2);
+
+                if (id === myId) {
+                    MAP_CTX.fillStyle = '#00CC00'; 
+                    MAP_CTX.fill();
+                    const rot = p.ry;
+                    const size = 7;
+                    MAP_CTX.fillStyle = '#008800'; 
+                    MAP_CTX.save();
+                    MAP_CTX.translate(mapX, mapY);
+                    MAP_CTX.rotate(rot); 
+                    MAP_CTX.moveTo(0, -size); 
+                    MAP_CTX.lineTo(-size * 0.5, size * 0.5); 
+                    MAP_CTX.lineTo(size * 0.5, size * 0.5); 
+                    MAP_CTX.closePath();
+                    MAP_CTX.fill();
+                    MAP_CTX.restore();
+
+                } else {
+                    MAP_CTX.fillStyle = p.name === GOD_NAME ? GOD_COLOR : '#CC0000';
+                    MAP_CTX.fill();
+                }
+            }
+        }
+
 
         // --- ANIMATION ---
         camera.position.set(0,0,100);
@@ -802,28 +963,23 @@
             requestAnimationFrame(animate);
 
             if (isPlaying) {
-                // ** FIX 2: Check video readiness for smoother performance **
                 if (video.readyState >= video.HAVE_CURRENT_DATA) {
                     videoTexture.needsUpdate = true;
                 }
             }
 
-            // Door animation
             const targetXDoor = isDoorOpen ? DOOR_OPEN_POS : DOOR_CLOSED_POS; 
             doorMesh.position.x += (targetXDoor - doorMesh.position.x) * DOOR_SPEED;
 
-            // Window animation
             const targetXGlass = isWindowClosed ? GLASS_CLOSED_X : (GLASS_START_X - windowGlassMesh.geometry.parameters.width); 
             const currentXGlass = windowGlassMesh.position.x;
             windowGlassMesh.position.x += (targetXGlass - currentXGlass) * CLOSE_SPEED;
             
-            // Calculate closure ratio for volume
             const range = GLASS_CLOSED_X - (GLASS_START_X - windowGlassMesh.geometry.parameters.width);
             const relativePosition = windowGlassMesh.position.x - (GLASS_START_X - windowGlassMesh.geometry.parameters.width);
             let closureRatio = relativePosition / range;
             closureRatio = Math.max(0, Math.min(1, closureRatio));
 
-            // Sound control
             const windowVolumeFactor = 1.0 - closureRatio;
             const SCREEN_Z_POS = BACK_Z; 
             const MAX_HEARING_DISTANCE = 600; 
@@ -838,10 +994,8 @@
             } else {
                 distanceVolumeFactor = 1.0 - (distance - MIN_DISTANCE_VOLUME_ONE) / (MAX_HEARING_DISTANCE - MIN_DISTANCE_VOLUME_ONE);
             }
-            // ** FIX 1: Set video volume based on window position and player distance **
             video.volume = windowVolumeFactor * distanceVolumeFactor;
 
-            // MOVEMENT & COLLISION 
             if(move.x!==0 || move.y!==0) {
                 const oldX = camera.position.x;
                 const oldZ = camera.position.z;
@@ -853,11 +1007,9 @@
                 camera.position.addScaledVector(fwd, -move.y * speed);
                 camera.position.addScaledVector(rgt, move.x * speed);
                 
-                // Outer wall bounds 
                 camera.position.x = Math.max(-maxPos, Math.min(maxPos, camera.position.x));
                 camera.position.z = Math.max(-(HALF_H - PLAYER_RADIUS), Math.min(HALF_H - PLAYER_RADIUS, camera.position.z));
                 
-                // Central wall collision check (Z=0 wall)
                 const playerZ = camera.position.z;
                 const playerX = camera.position.x;
                 
@@ -873,21 +1025,18 @@
                 }
             }
 
-            // Button visibility logic
             const isNearDoor = camera.position.z > -150 && camera.position.z < 150 && camera.position.x > -100 && camera.position.x < 100 && isPlaying;
             const isNearWindow = camera.position.z < (BACK_Z + 100) && camera.position.x > -150 && camera.position.x < 150 && isPlaying;
             doorBtn.style.display = isNearDoor ? "block" : "none";
             windowCloseBtn.style.display = isNearWindow ? "block" : "none";
 
 
-            // MULTIPLAYER ANIMATION - **SMOOTH LERPING**
             const time = Date.now() * 0.001;
             for(let id in otherPlayers) {
                 const p = otherPlayers[id];
                 p.mesh.position.lerp(p.tPos, INTERPOLATION_FACTOR); 
                 p.mesh.rotation.y += (p.tRot - p.mesh.rotation.y)*INTERPOLATION_FACTOR;
                 
-                // GOD MODE AURA ANIMATION
                 if (p.isGod) {
                     const aura = p.mesh.userData.auraMesh;
                     if (aura) {
@@ -897,15 +1046,16 @@
                 }
             }
 
-            document.getElementById('timer').style.display='none';
+            drawMinimap();
 
             renderer.render(scene, camera);
         }
         animate();
 
         // Cleanup on window close
-        window.addEventListener('beforeunload', () => {
-            if (roomCode !== "0" && myId) {
+        window.addEventListener('beforeunload', (e) => {
+            if (roomCode !== "0" && myId && isPlaying) {
+                // Do NOT use await here, as the browser will terminate immediately.
                 deleteDoc(doc(db, "rooms", roomCode, "players", myId)).catch(()=>{});
             }
         });
